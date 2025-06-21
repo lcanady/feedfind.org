@@ -1,0 +1,37 @@
+{
+  "title": "Encontrar Asistencia Alimentaria",
+  "placeholder": "Ingrese código postal o dirección",
+  "button": "Buscar",
+  "useLocation": "Usar Mi Ubicación",
+  "filters": "Filtros",
+  "results": "Resultados de Búsqueda",
+  "noResults": "No se encontraron resultados",
+  "resultsCount_one": "{{count}} resultado encontrado",
+  "resultsCount_other": "{{count}} resultados encontrados",
+  "loading": "Buscando ubicaciones...",
+  "error": "La búsqueda falló. Por favor, inténtelo de nuevo.",
+  "radius": "Radio de búsqueda",
+  "miles": "millas",
+  "kilometers": "kilómetros",
+  "sortBy": "Ordenar por",
+  "distance": "Distancia",
+  "rating": "Calificación",
+  "availability": "Disponibilidad",
+  "type": "Tipo",
+  "hours": "Horarios",
+  "status": {
+    "open": "Abierto",
+    "closed": "Cerrado",
+    "limited": "Limitado"
+  },
+  "accessibility": {
+    "searchInput": "Ingrese su ubicación para encontrar recursos cercanos",
+    "searchButton": "Buscar ubicaciones de asistencia alimentaria",
+    "useLocationButton": "Usar su ubicación actual para la búsqueda",
+    "filtersButton": "Abrir filtros de búsqueda",
+    "clearFilters": "Limpiar todos los filtros",
+    "sortButton": "Cambiar orden de clasificación",
+    "resultsRegion": "Resultados de búsqueda",
+    "noResultsMessage": "No se encontraron ubicaciones de asistencia alimentaria en esta área. Intente expandir su radio de búsqueda o usar una ubicación diferente."
+  }
+} 

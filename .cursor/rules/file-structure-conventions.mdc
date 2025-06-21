@@ -1,0 +1,93 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# File Structure & Naming Conventions
+
+## Next.js 14 App Router Structure
+```
+feedfind.org/
+├── app/                          # Next.js App Router
+│   ├── (auth)/                   # Route groups
+│   │   ├── login/page.tsx
+│   │   └── register/page.tsx
+│   ├── (dashboard)/
+│   │   ├── provider/
+│   │   └── admin/
+│   ├── location/[id]/page.tsx    # Dynamic routes
+│   ├── search/page.tsx
+│   ├── globals.css
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/                   # Reusable components
+│   ├── ui/                      # Base UI components
+│   │   ├── Button.tsx
+│   │   ├── Input.tsx
+│   │   └── Card.tsx
+│   ├── forms/                   # Form components
+│   ├── layout/                  # Layout components
+│   └── features/                # Feature-specific components
+│       ├── location/
+│       ├── search/
+│       └── auth/
+├── lib/                         # Utility functions
+│   ├── firebase.ts             # Firebase configuration
+│   ├── utils.ts                # General utilities
+│   ├── validations.ts          # Zod schemas
+│   └── constants.ts            # App constants
+├── hooks/                       # Custom React hooks
+│   ├── useAuth.ts
+│   ├── useLocation.ts
+│   └── useFirestore.ts
+├── types/                       # TypeScript type definitions
+│   ├── index.ts
+│   ├── user.ts
+│   ├── location.ts
+│   └── provider.ts
+└── public/                      # Static assets
+    ├── icons/
+    └── images/
+```
+
+## Naming Conventions
+
+### Files and Directories
+- **Components**: PascalCase (`LocationCard.tsx`, `SearchForm.tsx`)
+- **Pages**: lowercase with hyphens (`search-results`, `location-details`)
+- **Utilities**: camelCase (`formatDistance.ts`, `validateZipCode.ts`)
+- **Hooks**: camelCase starting with 'use' (`useAuth.ts`, `useLocation.ts`)
+- **Types**: camelCase (`userTypes.ts`, `locationTypes.ts`)
+
+### Variables and Functions
+- **Variables**: camelCase (`locationData`, `userPreferences`)
+- **Functions**: camelCase (`fetchLocations`, `updateStatus`)
+- **Constants**: UPPER_SNAKE_CASE (`API_ENDPOINTS`, `DEFAULT_RADIUS`)
+- **Components**: PascalCase (`LocationCard`, `StatusIndicator`)
+
+### CSS Classes (Tailwind)
+- Use semantic class names for components
+- Group related utilities together
+- Follow mobile-first responsive patterns
+
+### Firebase Collections
+- **Collections**: lowercase plural (`users`, `locations`, `providers`)
+- **Documents**: Use meaningful IDs when possible
+- **Fields**: camelCase (`firstName`, `lastUpdated`, `isVerified`)
+
+## Component Organization
+
+### UI Components (`/components/ui/`)
+- Base reusable components (Button, Input, Modal)
+- No business logic, purely presentational
+- Include accessibility features by default
+
+### Feature Components (`/components/features/`)
+- Business logic components organized by feature
+- Import and compose UI components
+- Handle state management and API calls
+
+### Layout Components (`/components/layout/`)
+- Header, Footer, Navigation, Sidebar
+- Responsive layout containers
+- Global application shell components

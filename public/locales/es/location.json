@@ -1,0 +1,45 @@
+{
+  "status": {
+    "open": "Abierto",
+    "closed": "Cerrado",
+    "limited": "Disponibilidad limitada"
+  },
+  "details": "Detalles",
+  "address": "Dirección",
+  "phone": "Teléfono",
+  "website": "Sitio web",
+  "hours": "Horarios",
+  "services": "Servicios",
+  "requirements": "Requisitos",
+  "notes": "Notas",
+  "directions": "Obtener Direcciones",
+  "call": "Llamar",
+  "visit": "Visitar Sitio Web",
+  "reviews_one": "{{count}} reseña",
+  "reviews_other": "{{count}} reseñas",
+  "rating": "Calificación",
+  "writeReview": "Escribir una Reseña",
+  "viewAllReviews": "Ver Todas las Reseñas",
+  "capacity": "Capacidad Actual",
+  "lastUpdated": "Última actualización",
+  "reportIssue": "Reportar un Problema",
+  "share": "Compartir Ubicación",
+  "favorite": "Agregar a Favoritos",
+  "unfavorite": "Eliminar de Favoritos",
+  "types": {
+    "foodBank": "Banco de Alimentos",
+    "soupKitchen": "Comedor Comunitario",
+    "pantry": "Despensa de Alimentos",
+    "mobile": "Distribución Móvil de Alimentos"
+  },
+  "accessibility": {
+    "statusIndicator": "Estado actual",
+    "phoneLink": "Llamar a la ubicación",
+    "websiteLink": "Visitar sitio web de la ubicación",
+    "directionsLink": "Obtener direcciones a la ubicación",
+    "favoriteButton": "Agregar ubicación a favoritos",
+    "shareButton": "Compartir información de la ubicación",
+    "reportButton": "Reportar problema con la ubicación",
+    "reviewButton": "Escribir reseña para la ubicación"
+  }
+} 

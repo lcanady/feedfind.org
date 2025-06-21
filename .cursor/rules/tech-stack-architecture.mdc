@@ -1,0 +1,48 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Tech Stack & Architecture Guidelines
+
+## Primary Tech Stack
+- **Frontend**: Next.js 14 with App Router
+- **Styling**: Tailwind CSS with custom design system
+- **Backend**: Firebase (Firestore, Auth, Functions, Hosting)
+- **Database**: Firestore with real-time listeners
+- **Authentication**: Firebase Auth (Email/Password, Google OAuth)
+- **Maps**: Google Maps JavaScript API
+- **State Management**: React Query/TanStack Query + React Context
+- **Forms**: React Hook Form with Zod validation
+- **UI Components**: Radix UI + custom accessible components
+
+## Architecture Principles
+1. **Mobile-First**: Design and develop for mobile, enhance for desktop
+2. **Accessibility-First**: WCAG 2.1 AA compliance throughout
+3. **Performance-First**: Optimize for older devices and slow connections
+4. **Progressive Enhancement**: Core functionality works without JavaScript
+5. **Real-time Data**: Leverage Firestore real-time listeners for live updates
+
+## Firestore Collections Structure
+```
+/users/{userId} - User profiles and preferences
+/providers/{providerId} - Food assistance organizations
+/locations/{locationId} - Physical service locations
+/services/{serviceId} - Specific services offered
+/reviews/{reviewId} - User reviews and ratings
+/updates/{updateId} - Real-time status updates
+```
+
+## Performance Requirements
+- First Contentful Paint: < 1.5 seconds
+- Total Bundle Size: < 200KB initial load
+- Support devices with 1-2GB RAM
+- Works on 3G connections
+- Lighthouse accessibility score: 90+
+
+## Code Quality Standards
+- TypeScript strict mode enabled
+- ESLint + Prettier for code formatting
+- Comprehensive error handling and loading states
+- Proper ARIA labels and semantic HTML
+- Mobile-responsive design patterns

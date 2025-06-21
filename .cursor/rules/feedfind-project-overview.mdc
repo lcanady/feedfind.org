@@ -1,0 +1,37 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# FeedFind.org Project Overview
+
+## Mission
+FeedFind.org is a real-time food assistance directory platform that connects food-insecure individuals with available food resources in their area. The platform emphasizes dignity, accessibility, and real-time availability tracking.
+
+## Key Documents
+- [Business Plan](mdc:businessPlan.md) - Comprehensive business strategy and market analysis
+- [Product Requirements Document](mdc:prd.md) - Detailed MVP specifications and features
+- [Development Todo List](mdc:FeedFind-Development-TodoList.md) - Comprehensive development roadmap
+- [Design Brief](mdc:FeedFind-Design-Brief.md) - Design philosophy and accessibility requirements
+
+## Target Users
+1. **Primary**: Food-insecure individuals seeking assistance
+2. **Secondary**: Food assistance providers (food banks, pantries, soup kitchens)
+3. **Tertiary**: Social workers, case managers, and community stakeholders
+
+## Core Value Proposition
+"Find food assistance near you with real-time availability - no more wasted trips to closed or empty locations."
+
+## Key Features (MVP)
+- Real-time location search with GPS/ZIP code
+- Live status updates (Open/Closed/Limited availability)
+- Provider portal for status management
+- Mobile-responsive design optimized for older devices
+- Accessibility-first approach (WCAG 2.1 AA compliance)
+- Review and rating system for community feedback
+
+## Social Impact Goals
+- Reduce "wasted trips" to closed or empty food assistance locations
+- Increase efficiency of food assistance network
+- Maintain user dignity through respectful, accessible design
+- Bridge the digital divide with performance-optimized platform

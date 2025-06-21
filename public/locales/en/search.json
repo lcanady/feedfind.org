@@ -1,0 +1,37 @@
+{
+  "title": "Find Food Assistance",
+  "placeholder": "Enter ZIP code or address",
+  "button": "Search",
+  "useLocation": "Use My Location",
+  "filters": "Filters",
+  "results": "Search Results",
+  "noResults": "No results found",
+  "resultsCount_one": "{{count}} result found",
+  "resultsCount_other": "{{count}} results found",
+  "loading": "Searching for locations...",
+  "error": "Search failed. Please try again.",
+  "radius": "Search radius",
+  "miles": "miles",
+  "kilometers": "kilometers",
+  "sortBy": "Sort by",
+  "distance": "Distance",
+  "rating": "Rating",
+  "availability": "Availability",
+  "type": "Type",
+  "hours": "Hours",
+  "status": {
+    "open": "Open",
+    "closed": "Closed",
+    "limited": "Limited"
+  },
+  "accessibility": {
+    "searchInput": "Enter your location to find nearby resources",
+    "searchButton": "Search for food assistance locations",
+    "useLocationButton": "Use your current location for search",
+    "filtersButton": "Open search filters",
+    "clearFilters": "Clear all filters",
+    "sortButton": "Change sort order",
+    "resultsRegion": "Search results",
+    "noResultsMessage": "No food assistance locations found in this area. Try expanding your search radius or using a different location."
+  }
+} 

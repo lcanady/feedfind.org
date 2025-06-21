@@ -1,0 +1,154 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Code Quality & Best Practices
+
+## TypeScript Standards
+- **Strict Mode**: Always enabled for type safety
+- **Type Definitions**: Explicit types for all function parameters and returns
+- **Interface Definitions**: Use interfaces for object shapes
+- **Enum Usage**: Use enums for constant values with meaning
+- **Generic Types**: Use generics for reusable components and functions
+
+## Component Standards
+
+### React Components
+```typescript
+// Good: Functional component with proper typing
+interface LocationCardProps {
+  location: Location;
+  onStatusUpdate: (id: string, status: LocationStatus) => void;
+}
+
+export const LocationCard: React.FC<LocationCardProps> = ({ 
+  location, 
+  onStatusUpdate 
+}) => {
+  return (
+    <article 
+      className="border border-gray-200 rounded-lg p-4"
+      role="article"
+      aria-label={`${location.name} - ${location.status}`}
+    >
+      {/* Component content */}
+    </article>
+  );
+};
+```
+
+### Accessibility Requirements
+- **ARIA Labels**: All interactive elements must have proper labels
+- **Semantic HTML**: Use appropriate HTML elements (article, nav, main, etc.)
+- **Keyboard Navigation**: All interactive elements accessible via keyboard
+- **Focus Management**: Visible focus indicators with high contrast
+- **Screen Reader Support**: Proper heading hierarchy and landmarks
+
+## Firebase Best Practices
+
+### Firestore Operations
+```typescript
+// Good: Proper error handling and typing
+export const fetchLocations = async (userId: string): Promise<Location[]> => {
+  try {
+    const snapshot = await getDocs(
+      query(
+        collection(db, 'locations'),
+        where('status', '==', 'active'),
+        orderBy('name')
+      )
+    );
+    
+    return snapshot.docs.map(doc => ({
+      id: doc.id,
+      ...doc.data()
+    } as Location));
+  } catch (error) {
+    console.error('Error fetching locations:', error);
+    throw new Error('Failed to fetch locations');
+  }
+};
+```
+
+### Security Rules Principles
+- **Least Privilege**: Grant minimum necessary permissions
+- **Authentication Required**: Most operations require authentication
+- **Data Validation**: Validate data structure and content
+- **Rate Limiting**: Prevent abuse through request limits
+
+## Performance Standards
+
+### Bundle Optimization
+- **Code Splitting**: Use dynamic imports for route-based splitting
+- **Tree Shaking**: Import only necessary functions from libraries
+- **Lazy Loading**: Load components and images only when needed
+- **Memoization**: Use React.memo for expensive component renders
+
+### Image Optimization
+```typescript
+// Good: Optimized image component
+import Image from 'next/image';
+
+export const LocationImage: React.FC<{ src: string; alt: string }> = ({ 
+  src, 
+  alt 
+}) => (
+  <Image
+    src={src}
+    alt={alt}
+    width={400}
+    height={300}
+    loading="lazy"
+    placeholder="blur"
+    className="rounded-lg"
+  />
+);
+```
+
+## Error Handling
+
+### Error States
+- **User-Friendly Messages**: Clear, actionable error messages
+- **Fallback UI**: Graceful degradation when features fail
+- **Retry Mechanisms**: Allow users to retry failed operations
+- **Loading States**: Show progress for long-running operations
+
+### Logging Standards
+```typescript
+// Good: Structured error logging
+export const logError = (error: Error, context: string, userId?: string) => {
+  console.error(`[${context}] Error:`, {
+    message: error.message,
+    stack: error.stack,
+    userId,
+    timestamp: new Date().toISOString()
+  });
+};
+```
+
+## Testing Requirements
+
+### Unit Tests
+- **Component Testing**: Test component rendering and interactions
+- **Utility Testing**: Test pure functions and utilities
+- **Hook Testing**: Test custom React hooks
+- **Coverage Target**: 80% code coverage minimum
+
+### Integration Tests
+- **API Integration**: Test Firebase operations
+- **Authentication Flow**: Test login/logout processes
+- **Form Submission**: Test form validation and submission
+- **Search Functionality**: Test location search and filtering
+
+### E2E Tests
+- **Critical Paths**: Test main user journeys
+- **Accessibility**: Test keyboard navigation and screen readers
+- **Performance**: Test page load times and responsiveness
+- **Cross-browser**: Test on multiple browsers and devices
+
+## Documentation Standards
+- **JSDoc Comments**: Document all public functions and components
+- **README Updates**: Keep documentation current with changes
+- **Type Documentation**: Include examples in type definitions
+- **API Documentation**: Document all Firebase operations and rules

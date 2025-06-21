@@ -1,0 +1,45 @@
+{
+  "status": {
+    "open": "Open",
+    "closed": "Closed", 
+    "limited": "Limited availability"
+  },
+  "details": "Details",
+  "address": "Address",
+  "phone": "Phone",
+  "website": "Website",
+  "hours": "Hours",
+  "services": "Services",
+  "requirements": "Requirements",
+  "notes": "Notes",
+  "directions": "Get Directions",
+  "call": "Call",
+  "visit": "Visit Website",
+  "reviews_one": "{{count}} review",
+  "reviews_other": "{{count}} reviews",
+  "rating": "Rating",
+  "writeReview": "Write a Review",
+  "viewAllReviews": "View All Reviews",
+  "capacity": "Current Capacity",
+  "lastUpdated": "Last updated",
+  "reportIssue": "Report an Issue",
+  "share": "Share Location",
+  "favorite": "Add to Favorites",
+  "unfavorite": "Remove from Favorites",
+  "types": {
+    "foodBank": "Food Bank",
+    "soupKitchen": "Soup Kitchen", 
+    "pantry": "Food Pantry",
+    "mobile": "Mobile Food Distribution"
+  },
+  "accessibility": {
+    "statusIndicator": "Current status",
+    "phoneLink": "Call location",
+    "websiteLink": "Visit location website",
+    "directionsLink": "Get directions to location",
+    "favoriteButton": "Add location to favorites",
+    "shareButton": "Share location information",
+    "reportButton": "Report issue with location",
+    "reviewButton": "Write review for location"
+  }
+} 

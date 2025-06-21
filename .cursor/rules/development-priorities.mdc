@@ -1,0 +1,90 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+# Development Priorities & MVP Focus
+
+## MVP Timeline (First 3 Months)
+Reference the complete roadmap in [Development Todo List](mdc:FeedFind-Development-TodoList.md)
+
+### Week 1-2: Foundation
+- Next.js 14 project setup with TypeScript
+- Firebase configuration (Auth, Firestore, Hosting)
+- Basic authentication system
+- Essential dependencies installation
+- Development environment setup
+
+### Week 3-4: Core Database & UI
+- Firestore collections design and security rules
+- Basic UI component library
+- User authentication flows
+- Provider registration system
+- Mobile-responsive layout foundation
+
+### Week 5-6: Search & Location Features
+- Location search with Google Places API
+- GPS-based "Use My Location" functionality
+- Basic location listings display
+- Interactive map integration
+- Search filters (distance, status, type)
+
+### Week 7-8: Provider Portal
+- Provider dashboard for location management
+- Real-time status update interface
+- Location information editing
+- Basic analytics for providers
+- Status update confirmation system
+
+### Week 9-10: Reviews & Admin
+- User review and rating system
+- Basic admin dashboard
+- Content moderation interface
+- Provider approval workflow
+- System health monitoring
+
+### Week 11-12: Testing & Launch Prep
+- Comprehensive testing (unit, integration, e2e)
+- Accessibility audit and fixes
+- Performance optimization
+- Security review
+- Soft launch preparation
+
+## Critical MVP Features (Must-Have)
+1. **User Authentication**: Firebase Auth with email/password
+2. **Location Search**: ZIP code and GPS-based search
+3. **Real-time Status**: Live open/closed/limited indicators
+4. **Provider Portal**: Dashboard for status updates
+5. **Mobile Responsive**: Works well on all devices
+6. **Basic Admin**: Provider approval and content moderation
+7. **Security**: Proper Firestore rules and data protection
+
+## Performance Priorities
+- **Load Speed**: First Contentful Paint < 1.5 seconds
+- **Bundle Size**: Initial load < 200KB
+- **Accessibility**: WCAG 2.1 AA compliance throughout
+- **Mobile-First**: Optimized for older smartphones
+- **Offline Support**: Basic functionality without internet
+
+## Development Principles
+1. **Accessibility First**: Every feature must be accessible
+2. **Performance First**: Optimize for low-end devices
+3. **Mobile First**: Design and develop for mobile, enhance for desktop
+4. **Progressive Enhancement**: Core functionality works without JavaScript
+5. **User Dignity**: Respectful, non-stigmatizing design approach
+
+## Post-MVP Priorities (Months 3-6)
+- Advanced search filters and personalization
+- Push notifications for status updates
+- Multi-language support (Spanish priority)
+- Provider analytics and reporting
+- Community features and social sharing
+- API for third-party integrations
+
+## Success Metrics to Track
+- User registration and retention rates
+- Location search completion rates
+- Provider adoption and update frequency
+- Page load times and Core Web Vitals
+- Accessibility compliance scores
+- User satisfaction and feedback
