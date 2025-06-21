@@ -331,7 +331,7 @@ export default function Home() {
                 <ul className="space-y-1">
                   <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
                   <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
-                  <li><a href="#" className="text-blue-600 hover:underline">provider resources</a></li>
+                  <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
                   <li><a href="#" className="text-blue-600 hover:underline">bulk posting</a></li>
                 </ul>
               </div>

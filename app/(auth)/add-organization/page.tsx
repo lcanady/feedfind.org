@@ -311,7 +311,7 @@ export default function AddOrganizationPage() {
               <ul className="space-y-1">
                 <li><Link href="/add-organization" className="text-blue-600 hover:underline font-medium">add your organization</Link></li>
                 <li><a href="#" className="text-blue-600 hover:underline">update your listing</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">provider resources</a></li>
+                                  <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
                 <li><a href="#" className="text-blue-600 hover:underline">bulk posting</a></li>
               </ul>
             </div>

@@ -184,7 +184,14 @@ export default function ProviderPage() {
                     Register Your Organization
                   </Link>
                   
-                  <div>
+                  <div className="flex flex-col sm:flex-row gap-4 items-center justify-center">
+                    <Link
+                      href="/provider-resources"
+                      className="text-blue-600 hover:underline font-medium"
+                    >
+                      📚 Provider Resources & Guide
+                    </Link>
+                    <span className="text-gray-300 hidden sm:inline">|</span>
                     <Link
                       href="/"
                       className="text-purple-600 hover:underline"
@@ -219,7 +226,7 @@ export default function ProviderPage() {
                 <ul className="space-y-1">
                   <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
                   <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
-                  <li><a href="#" className="text-blue-600 hover:underline">provider resources</a></li>
+                  <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
                   <li><a href="#" className="text-blue-600 hover:underline">bulk posting</a></li>
                 </ul>
               </div>
