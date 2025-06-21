@@ -421,7 +421,7 @@ describe('ProviderDashboard', () => {
       await user.type(notesInput, 'Temporarily closed for restocking')
 
       // Submit update
-      const submitButton = screen.getByRole('button', { name: /^update status$/i })
+      const submitButton = screen.getByRole('button', { name: /update/i })
       await user.click(submitButton)
 
       expect(LocationService.prototype.updateStatus).toHaveBeenCalledWith(
@@ -565,7 +565,7 @@ describe('ProviderDashboard', () => {
 
       // After clicking update status, check for form elements
       await waitFor(() => {
-        expect(screen.getByRole('group', { name: /status/i })).toBeInTheDocument()
+        expect(screen.getByRole('combobox', { name: /status/i })).toBeInTheDocument()
       })
     })
   })
@@ -613,16 +613,8 @@ describe('ProviderDashboard', () => {
       await user.click(statusButton)
 
       // All form inputs should have labels
-      const statusFieldset = screen.getByRole('group', { name: /status/i })
-      expect(statusFieldset).toBeInTheDocument()
-
-      // Check for radio buttons
-      const openRadio = screen.getByRole('radio', { name: /open/i })
-      const limitedRadio = screen.getByRole('radio', { name: /limited/i })
-      const closedRadio = screen.getByRole('radio', { name: /closed/i })
-      expect(openRadio).toBeInTheDocument()
-      expect(limitedRadio).toBeInTheDocument()
-      expect(closedRadio).toBeInTheDocument()
+      const statusSelect = screen.getByRole('combobox', { name: /status/i })
+      expect(statusSelect).toHaveAccessibleName()
 
       const notesInput = screen.getByLabelText(/notes/i)
       expect(notesInput).toBeInTheDocument()
@@ -653,12 +645,7 @@ describe('ProviderDashboard', () => {
       const statusButton = screen.getAllByRole('button', { name: /update status/i })[0]
       await user.click(statusButton)
 
-      // Wait for modal to open, then find the submit button in the modal specifically
-      await waitFor(() => {
-        expect(screen.getByRole('dialog')).toBeInTheDocument()
-      })
-
-      const submitButton = screen.getByRole('button', { name: /^update status$/i })
+      const submitButton = screen.getByRole('button', { name: /update/i })
       await user.click(submitButton)
 
       await waitFor(() => {

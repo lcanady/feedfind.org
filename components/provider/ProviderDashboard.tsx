@@ -228,7 +228,6 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     } catch (err) {
       console.error('Failed to update status:', err)
       setError(err instanceof Error ? err.message : 'Failed to update status')
-      // Don't close the modal on error so user can retry
     }
   }
 
@@ -356,7 +355,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
   if (loading) {
     return (
-      <div className={`p-6 ${className}`}>
+      <div className={className}>
         <div className="animate-pulse">
           <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -376,7 +375,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   // Show registration form if provider doesn't exist and user should create one
   if (showRegistrationForm) {
     return (
-      <div className={`p-6 ${className}`}>
+      <div className={className}>
         <ProviderRegistrationForm
           onProviderCreated={handleProviderCreated}
           onCancel={handleRegistrationCancel}
@@ -389,7 +388,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     const isProviderNotFoundError = error.includes('Provider profile not found') || error.includes('Provider with ID')
     
     return (
-      <div className={`p-6 ${className}`}>
+      <div className={className}>
         <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center max-w-2xl mx-auto">
           <div className="text-red-600 mb-4">
             <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -408,12 +407,6 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
             >
               Try Again
             </button>
-            <button
-              onClick={handleRetry}
-              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
-            >
-              Retry
-            </button>
             
             {isProviderNotFoundError && !isAdminOrSuperuser && (
               <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -422,7 +415,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                   If you're a food assistance organization, you can register to create your provider profile.
                 </p>
                 <a 
-                  href="/register" 
+                  href="/add-organization" 
                   className="inline-block bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors"
                 >
                   Register as Provider
@@ -459,7 +452,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
   if (!data.provider) {
     return (
-      <div className={`p-6 ${className}`}>
+      <div className={className}>
         <div className="text-center text-gray-500">
           <p>Provider not found</p>
         </div>
@@ -468,7 +461,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   }
 
   return (
-    <div className={`p-6 ${className}`}>
+    <div className={className}>
       {/* Header */}
       <div className="mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
@@ -788,8 +781,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       {/* Status Update Modal */}
       {showStatusModal && selectedLocation && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg p-6 w-full max-w-md" role="dialog" aria-labelledby="status-modal-title">
-            <h3 id="status-modal-title" className="text-lg font-semibold mb-4">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">
               {isAdminView() ? 'Admin Update Status' : 'Update Status'}: {selectedLocation.name}
             </h3>
             {isAdminView() && (
@@ -799,47 +792,28 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                 </p>
               </div>
             )}
-            {/* Validation Error Message */}
-            {error && error.toLowerCase().includes('status') && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
-                <p className="text-sm text-red-600">Please select a status</p>
-              </div>
-            )}
             <form onSubmit={(e) => {
               e.preventDefault()
-              if (!statusUpdateForm.status) {
-                setError('Please select a status before submitting')
-                return
+              if (statusUpdateForm.status) {
+                handleStatusUpdate(selectedLocation.id, statusUpdateForm.status as CurrentLocationStatus, statusUpdateForm.notes)
               }
-              handleStatusUpdate(selectedLocation.id, statusUpdateForm.status as CurrentLocationStatus, statusUpdateForm.notes)
             }}>
               <div className="space-y-4">
-                <fieldset>
-                  <legend className="block text-sm font-medium text-gray-700 mb-3">Status</legend>
-                  <div className="space-y-2">
-                    {[
-                      { value: 'open', label: 'Open' },
-                      { value: 'limited', label: 'Limited' },
-                      { value: 'closed', label: 'Closed' }
-                    ].map((option) => (
-                      <div key={option.value} className="flex items-center">
-                        <input
-                          type="radio"
-                          id={`status-${option.value}`}
-                          name="status"
-                          value={option.value}
-                          checked={statusUpdateForm.status === option.value}
-                          onChange={(e) => setStatusUpdateForm(prev => ({ ...prev, status: e.target.value as CurrentLocationStatus }))}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          required
-                        />
-                        <label htmlFor={`status-${option.value}`} className="ml-2 text-sm text-gray-700">
-                          {option.label}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </fieldset>
+                <div>
+                  <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                  <select
+                    id="status"
+                    value={statusUpdateForm.status}
+                    onChange={(e) => setStatusUpdateForm(prev => ({ ...prev, status: e.target.value as CurrentLocationStatus }))}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Select status</option>
+                    <option value="open">Open</option>
+                    <option value="limited">Limited</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
                 <div>
                   <label htmlFor="notes" className="block text-sm font-medium text-gray-700">Notes</label>
                   <textarea
@@ -855,16 +829,14 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
               <div className="mt-6 flex justify-end space-x-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    setShowStatusModal(false)
-                    setError('') // Clear any validation errors
-                  }}
+                  onClick={() => setShowStatusModal(false)}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
+                  disabled={!statusUpdateForm.status}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-300"
                 >
                   Update Status
@@ -964,47 +936,28 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
             <p className="text-sm text-gray-600 mb-4">
               Update status for {selectedLocations.length} selected location(s)
             </p>
-            {/* Validation Error Message */}
-            {error && error.toLowerCase().includes('status') && (
-              <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded">
-                <p className="text-sm text-red-600">Please select a status</p>
-              </div>
-            )}
             <form onSubmit={(e) => {
               e.preventDefault()
-              if (!statusUpdateForm.status) {
-                setError('Please select a status before submitting')
-                return
+              if (statusUpdateForm.status) {
+                handleBulkStatusUpdate(statusUpdateForm.status as CurrentLocationStatus, selectedLocations)
               }
-              handleBulkStatusUpdate(statusUpdateForm.status as CurrentLocationStatus, selectedLocations)
             }}>
               <div className="space-y-4">
-                <fieldset>
-                  <legend className="block text-sm font-medium text-gray-700 mb-3">Status</legend>
-                  <div className="space-y-2">
-                    {[
-                      { value: 'open', label: 'Open' },
-                      { value: 'limited', label: 'Limited' },
-                      { value: 'closed', label: 'Closed' }
-                    ].map((option) => (
-                      <div key={option.value} className="flex items-center">
-                        <input
-                          type="radio"
-                          id={`bulk-status-${option.value}`}
-                          name="bulkStatus"
-                          value={option.value}
-                          checked={statusUpdateForm.status === option.value}
-                          onChange={(e) => setStatusUpdateForm(prev => ({ ...prev, status: e.target.value as CurrentLocationStatus }))}
-                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300"
-                          required
-                        />
-                        <label htmlFor={`bulk-status-${option.value}`} className="ml-2 text-sm text-gray-700">
-                          {option.label}
-                        </label>
-                      </div>
-                    ))}
-                  </div>
-                </fieldset>
+                <div>
+                  <label htmlFor="bulkStatus" className="block text-sm font-medium text-gray-700">Status</label>
+                  <select
+                    id="bulkStatus"
+                    value={statusUpdateForm.status}
+                    onChange={(e) => setStatusUpdateForm(prev => ({ ...prev, status: e.target.value as CurrentLocationStatus }))}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  >
+                    <option value="">Select status</option>
+                    <option value="open">Open</option>
+                    <option value="limited">Limited</option>
+                    <option value="closed">Closed</option>
+                  </select>
+                </div>
                 <div>
                   <label htmlFor="bulkNotes" className="block text-sm font-medium text-gray-700">Notes</label>
                   <textarea
@@ -1023,7 +976,6 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                   onClick={() => {
                     setShowBulkUpdateModal(false)
                     setSelectedLocations([])
-                    setError('') // Clear any validation errors
                   }}
                   className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
@@ -1031,6 +983,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                 </button>
                 <button
                   type="submit"
+                  disabled={!statusUpdateForm.status}
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-300"
                 >
                   Update All

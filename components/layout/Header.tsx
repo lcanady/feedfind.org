@@ -25,8 +25,7 @@ export default function Header() {
     return user?.email || 'User'
   }
 
-  // Check if user is provider or admin
-  const isProviderOrAdmin = user?.role === 'provider' || user?.role === 'admin' || user?.role === 'superuser'
+
 
   return (
     <div className="border-b border-gray-200 bg-white">
@@ -44,9 +43,12 @@ export default function Header() {
           </div>
           
           <div className="hidden md:flex items-center space-x-6">
-            <button className="text-blue-600 hover:underline text-sm">
-              post food resources
-            </button>
+            <Link 
+              href="/add-organization" 
+              className="text-blue-600 hover:underline text-sm"
+            >
+              add your organization
+            </Link>
             
             {/* Authentication Links */}
             {loading ? (
@@ -56,16 +58,7 @@ export default function Header() {
                 <span className="text-sm text-gray-700">
                   Welcome, {getUserDisplayName()}
                 </span>
-                {/* Provider Dashboard link for providers and admins */}
-                {isProviderOrAdmin && (
-                  <Link 
-                    href={"/provider" as any}
-                    className="text-green-600 hover:underline text-sm font-medium"
-                    title="Provider Dashboard"
-                  >
-                    dashboard
-                  </Link>
-                )}
+
                 {/* Admin link for admin/superuser roles */}
                 {(user?.role === 'admin' || user?.role === 'superuser') && (
                   <Link 
@@ -119,16 +112,6 @@ export default function Header() {
             )}
             {!loading && isAuthenticated && (
               <div className="flex items-center space-x-3">
-                {/* Provider Dashboard link for mobile */}
-                {isProviderOrAdmin && (
-                  <Link 
-                    href={"/provider" as any}
-                    className="text-green-600 hover:underline text-sm font-medium"
-                    title="Provider Dashboard"
-                  >
-                    dashboard
-                  </Link>
-                )}
                 {/* Admin link for mobile */}
                 {(user?.role === 'admin' || user?.role === 'superuser') && (
                   <Link 

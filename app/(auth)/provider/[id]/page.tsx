@@ -1,22 +1,13 @@
 'use client'
 
+import { useParams } from 'next/navigation'
 import { useAuth } from '../../../../hooks/useAuth'
 import { ProviderDashboard } from '../../../../components/provider/ProviderDashboard'
 import ProtectedRoute from '../../../../components/auth/ProtectedRoute'
 
-interface ProviderPageProps {
-  params: Promise<{
-    id: string
-  }>
-}
-
-export default async function ProviderByIdPage({ params }: ProviderPageProps) {
-  const { id: providerId } = await params
-  
-  return <ProviderPageContent providerId={providerId} />
-}
-
-function ProviderPageContent({ providerId }: { providerId: string }) {
+export default function ProviderByIdPage() {
+  const params = useParams()
+  const providerId = params.id as string
   const { user, isProvider, isAdminOrSuperuser } = useAuth()
 
   // Check if user has access to view this provider's dashboard

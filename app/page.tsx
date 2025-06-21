@@ -326,15 +326,15 @@ export default function Home() {
                 <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>
               </ul>
             </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">providers</h3>
-              <ul className="space-y-1">
-                <li><Link href="/provider-register" as="/provider-register" className="text-blue-600 hover:underline">add your organization</Link></li>
-                <li><a href="#" className="text-blue-600 hover:underline">update your listing</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">provider resources</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">bulk posting</a></li>
-              </ul>
-            </div>
+                          <div>
+                <h3 className="font-semibold text-gray-900 mb-2">providers</h3>
+                <ul className="space-y-1">
+                  <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
+                  <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
+                  <li><a href="#" className="text-blue-600 hover:underline">provider resources</a></li>
+                  <li><a href="#" className="text-blue-600 hover:underline">bulk posting</a></li>
+                </ul>
+              </div>
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">community</h3>
               <ul className="space-y-1">

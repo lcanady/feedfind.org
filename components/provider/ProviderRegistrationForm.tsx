@@ -54,26 +54,28 @@ export const ProviderRegistrationForm: React.FC<ProviderRegistrationFormProps> =
 
   const providerService = new ProviderService()
 
-  // Format phone number as (XXX) XXX-XXXX
   const formatPhoneNumber = (value: string): string => {
-    // Remove all non-digits
-    const digits = value.replace(/\D/g, '')
+    // Remove all non-numeric characters
+    const phoneNumber = value.replace(/\D/g, '')
     
-    // Limit to 10 digits for US phone numbers
-    const limitedDigits = digits.slice(0, 10)
+    // Don't format if empty
+    if (!phoneNumber) return ''
+    
+    // Don't format if too long
+    if (phoneNumber.length > 10) return phoneNumber.slice(0, 10)
     
     // Format based on length
-    if (limitedDigits.length <= 3) {
-      return limitedDigits
-    } else if (limitedDigits.length <= 6) {
-      return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3)}`
+    if (phoneNumber.length <= 3) {
+      return phoneNumber
+    } else if (phoneNumber.length <= 6) {
+      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3)}`
     } else {
-      return `(${limitedDigits.slice(0, 3)}) ${limitedDigits.slice(3, 6)}-${limitedDigits.slice(6)}`
+      return `(${phoneNumber.slice(0, 3)}) ${phoneNumber.slice(3, 6)}-${phoneNumber.slice(6)}`
     }
   }
 
   const handleInputChange = (field: keyof ProviderFormData, value: string) => {
-    // Apply phone formatting for phone field
+    // Apply phone formatting if this is the phone field
     const processedValue = field === 'phone' ? formatPhoneNumber(value) : value
     
     setFormData(prev => ({
@@ -111,16 +113,10 @@ export const ProviderRegistrationForm: React.FC<ProviderRegistrationFormProps> =
     if (!formData.phone.trim()) {
       errors.push('Phone number is required')
     } else {
-      // Validate that we have exactly 10 digits and proper format
-      const phoneDigits = formData.phone.replace(/\D/g, '')
-      if (phoneDigits.length !== 10) {
-        errors.push('Please enter a complete 10-digit phone number')
-      } else {
-        // Also validate the exact format expected by the server
-        const phoneRegex = /^\(\d{3}\) \d{3}-\d{4}$/
-        if (!phoneRegex.test(formData.phone)) {
-          errors.push('Phone number must be in the format (XXX) XXX-XXXX')
-        }
+      // Validate phone number format - should have 10 digits when formatted
+      const digitsOnly = formData.phone.replace(/\D/g, '')
+      if (digitsOnly.length !== 10) {
+        errors.push('Please enter a valid 10-digit phone number')
       }
     }
     
@@ -164,7 +160,16 @@ export const ProviderRegistrationForm: React.FC<ProviderRegistrationFormProps> =
         locationIds: []
       }
       
-      const createdProvider = await providerService.create(newProvider)
+      // Create provider with managedBy field for multiple organizations support
+      const providerData = {
+        ...newProvider,
+        managedBy: user.uid, // Link this provider to the user
+        createdAt: new Date(),
+        updatedAt: new Date()
+      }
+      
+      // Use the database service to create with auto-generated ID
+      const createdProvider = await providerService.create(providerData)
       
       // Announce success to screen readers
       const announcement = `Provider profile created successfully for ${formData.organizationName}`
@@ -179,25 +184,7 @@ export const ProviderRegistrationForm: React.FC<ProviderRegistrationFormProps> =
       onProviderCreated(createdProvider)
     } catch (err) {
       console.error('Failed to create provider:', err)
-      
-      // Provide more specific error messages
-      let errorMessage = 'Failed to create provider profile'
-      
-      if (err instanceof Error) {
-        if (err.message.includes('Phone number must be in format')) {
-          errorMessage = 'Please complete your phone number in the format (XXX) XXX-XXXX'
-        } else if (err.message.includes('email')) {
-          errorMessage = 'Please enter a valid email address'
-        } else if (err.message.includes('Organization name')) {
-          errorMessage = 'Organization name is required'
-        } else if (err.message.includes('permission')) {
-          errorMessage = 'You do not have permission to create a provider profile. Please contact support.'
-        } else {
-          errorMessage = err.message
-        }
-      }
-      
-      setError(errorMessage)
+      setError(err instanceof Error ? err.message : 'Failed to create provider profile')
     } finally {
       setLoading(false)
     }
@@ -291,6 +278,9 @@ export const ProviderRegistrationForm: React.FC<ProviderRegistrationFormProps> =
                 onChange={(e) => handleInputChange('phone', e.target.value)}
                 className="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 placeholder="(555) 123-4567"
+                maxLength={14}
+                inputMode="tel"
+                autoComplete="tel"
                 required
                 disabled={loading}
               />

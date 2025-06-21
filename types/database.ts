@@ -102,6 +102,7 @@ export interface Provider extends BaseDocument {
   verificationNotes?: string
   adminNotes?: string
   locationIds?: string[] // Array of location IDs managed by this provider
+  managedBy?: string // User ID of who manages this provider (for multiple orgs per user)
   socialMedia?: {
     facebook?: string
     twitter?: string

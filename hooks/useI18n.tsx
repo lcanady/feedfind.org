@@ -304,21 +304,22 @@ export const usePlural = () => {
   const plural = (count: number, forms: string[]): string => {
     const pluralRules = new Intl.PluralRules(locale)
     const rule = pluralRules.select(count)
-    const fallback = forms[forms.length - 1] || ''
     
     switch (rule) {
       case 'zero':
-        return forms[0] || fallback
+        return forms[0] || forms[forms.length - 1] || ''
       case 'one':
-        return forms[0] || fallback
+        return forms[0] || forms[forms.length - 1] || ''
       case 'two':
-        return forms[1] || fallback
+        return forms[1] || forms[0] || forms[forms.length - 1] || ''
       case 'few':
-        return forms[2] || fallback
+        return forms[2] || forms[1] || forms[0] || forms[forms.length - 1] || ''
       case 'many':
-        return forms[3] || fallback
+        return forms[3] || forms[2] || forms[1] || forms[0] || forms[forms.length - 1] || ''
+      case 'other':
+        return forms[forms.length - 1] || forms[0] || forms[1] || ''
       default:
-        return fallback
+        return forms[0] || forms[forms.length - 1] || ''
     }
   }
   
