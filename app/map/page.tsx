@@ -205,18 +205,58 @@ export default function MapPage() {
                   {selectedLocation.location.operatingHours && (
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Operating Hours</h4>
-                      <div className="space-y-1 text-sm">
-                        {Object.entries(selectedLocation.location.operatingHours).map(([day, hours]) => {
-                          if (day === 'specialHours') return null
-                          return (
-                            <div key={day} className="flex justify-between">
-                              <span className="capitalize text-gray-600">{day}:</span>
-                              <span className="text-gray-900">
-                                {hours?.closed ? 'Closed' : `${hours?.open} - ${hours?.close}`}
-                              </span>
-                            </div>
-                          )
-                        })}
+                      <div className="bg-gray-50 rounded-lg p-3">
+                        <div className="space-y-1">
+                          {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                            const dayHours = selectedLocation.location.operatingHours?.[day as keyof typeof selectedLocation.location.operatingHours]
+                            if (day === 'specialHours') return null
+                            
+                            const isToday = day === ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]
+                            const dayLabels: Record<string, string> = {
+                              monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
+                              thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
+                            }
+                            
+                            const formatTime = (time: string) => {
+                              if (time.includes('AM') || time.includes('PM')) return time
+                              const [hours, minutes] = time.split(':')
+                              const hour = parseInt(hours)
+                              const ampm = hour >= 12 ? 'PM' : 'AM'
+                              const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                              return `${displayHour}:${minutes} ${ampm}`
+                            }
+                            
+                            // Type guard to check if dayHours is a day schedule object
+                            const isDaySchedule = dayHours && typeof dayHours === 'object' && 'open' in dayHours && 'close' in dayHours
+                            const isDayOpen = isDaySchedule && !dayHours.closed && dayHours.open && dayHours.close
+                            
+                            return (
+                              <div 
+                                key={day} 
+                                className={`flex justify-between items-center py-1 px-2 rounded ${
+                                  isToday ? 'bg-blue-100 border-l-2 border-blue-500' : ''
+                                }`}
+                              >
+                                <span className={`text-sm capitalize ${
+                                  isToday ? 'font-semibold text-blue-900' : 'text-gray-700'
+                                }`}>
+                                  {dayLabels[day]}
+                                  {isToday && <span className="ml-1 text-xs text-blue-600">(Today)</span>}
+                                </span>
+                                <span className={`text-sm ${
+                                  isDayOpen 
+                                    ? (isToday ? 'font-semibold text-green-800' : 'text-gray-900')
+                                    : (isToday ? 'font-semibold text-red-800' : 'text-gray-500')
+                                }`}>
+                                  {isDayOpen && isDaySchedule
+                                    ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`
+                                    : 'Closed'
+                                  }
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
                       </div>
                     </div>
                   )}

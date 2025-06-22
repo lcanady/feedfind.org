@@ -3,10 +3,13 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { SearchForm } from '../../components/search/SearchForm'
+import { Suspense as ReactSuspense } from 'react'
 import Header from '../../components/layout/Header'
+import { MainSearchForm } from '../../components/search/MainSearchForm'
 import { FooterAd } from '../../components/ui/AdSense'
 import type { LocationSearchResult } from '../../types/database'
+import { OperatingHours } from '@/components/ui/OperatingHours'
+import { AdSense, HeaderAd, SidebarAd, FooterAd as FooterAdComponent } from '@/components/ui/AdSense'
 
 function SearchPageContent() {
   const [results, setResults] = useState<LocationSearchResult[]>([])
@@ -50,7 +53,7 @@ function SearchPageContent() {
 
           {/* Search Form */}
           <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <SearchForm
+            <MainSearchForm
               onResults={handleResults}
               onError={handleError}
               onLoading={handleLoading}
@@ -143,14 +146,69 @@ function SearchPageContent() {
                     {/* Operating Hours */}
                     {result.location.operatingHours && (
                       <div className="mb-4">
-                        <h4 className="font-medium text-gray-900 mb-2">Hours</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 text-sm text-gray-600">
-                          {Object.entries(result.location.operatingHours).map(([day, hours]) => (
-                            <div key={day} className="flex justify-between">
-                              <span className="capitalize">{day}:</span>
-                              <span>{hours && !hours.closed ? `${hours.open} - ${hours.close}` : 'Closed'}</span>
+                        <h4 className="font-medium text-gray-900 mb-3">Hours</h4>
+                        <div className="bg-gray-50 rounded-lg p-3">
+                          <div className="space-y-1">
+                            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
+                              const dayHours = result.location.operatingHours?.[day as keyof typeof result.location.operatingHours]
+                              const isToday = day === ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]
+                              const dayLabels: Record<string, string> = {
+                                monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
+                                thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
+                              }
+                              
+                              const formatTime = (time: string) => {
+                                if (time.includes('AM') || time.includes('PM')) return time
+                                const [hours, minutes] = time.split(':')
+                                const hour = parseInt(hours)
+                                const ampm = hour >= 12 ? 'PM' : 'AM'
+                                const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
+                                return `${displayHour}:${minutes} ${ampm}`
+                              }
+                              
+                              const isDayOpen = dayHours && !dayHours.closed && dayHours.open && dayHours.close
+                              
+                              return (
+                                <div 
+                                  key={day} 
+                                  className={`flex justify-between items-center py-1 px-2 rounded ${
+                                    isToday ? 'bg-blue-100 border-l-2 border-blue-500' : ''
+                                  }`}
+                                >
+                                  <span className={`text-sm ${
+                                    isToday ? 'font-semibold text-blue-900' : 'text-gray-700'
+                                  }`}>
+                                    {dayLabels[day]}
+                                    {isToday && <span className="ml-1 text-xs text-blue-600">(Today)</span>}
+                                  </span>
+                                  <span className={`text-sm ${
+                                    isDayOpen 
+                                      ? (isToday ? 'font-semibold text-green-800' : 'text-gray-900')
+                                      : (isToday ? 'font-semibold text-red-800' : 'text-gray-500')
+                                  }`}>
+                                    {isDayOpen 
+                                      ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`
+                                      : 'Closed'
+                                    }
+                                  </span>
+                                </div>
+                              )
+                            })}
+                          </div>
+                          
+                          {/* Quick summary */}
+                          <div className="mt-3 pt-3 border-t border-gray-200">
+                            <div className="text-xs text-gray-600">
+                              <span className="font-medium">Open: </span>
+                              {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
+                                .filter(day => {
+                                  const dayHours = result.location.operatingHours?.[day as keyof typeof result.location.operatingHours]
+                                  return dayHours && !dayHours.closed && dayHours.open && dayHours.close
+                                })
+                                .map(day => day.slice(0, 3).charAt(0).toUpperCase() + day.slice(1, 3))
+                                .join(', ') || 'No regular hours'}
                             </div>
-                          ))}
+                          </div>
                         </div>
                       </div>
                     )}
