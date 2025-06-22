@@ -105,4 +105,53 @@ export const FooterAd: React.FC = () => (
     className="mt-4"
     style={{ textAlign: 'center', minHeight: '90px', backgroundColor: '#f9fafb' }}
   />
+)
+
+// Forum-specific ad components
+export const ForumPostAd: React.FC = () => (
+  <div className="bg-white border border-gray-200 rounded-lg p-4 mb-8">
+    <div className="text-xs text-gray-500 mb-2 text-center">Advertisement</div>
+    <AdSense
+      adSlot="1234567893" // Replace with actual ad slot for forum posts
+      adFormat="horizontal"
+      className="text-center"
+      style={{ minHeight: '90px', backgroundColor: '#f9fafb' }}
+    />
+  </div>
+)
+
+export const ForumSidebarAd: React.FC = () => (
+  <div className="bg-white border border-gray-200 rounded-lg p-4">
+    <div className="text-xs text-gray-500 mb-2 text-center">Advertisement</div>
+    <AdSense
+      adSlot="1234567895" // Replace with actual ad slot for forum sidebar
+      adFormat="rectangle"
+      className="text-center"
+      style={{ minHeight: '250px', backgroundColor: '#f9fafb' }}
+    />
+  </div>
+)
+
+export const ForumReplyAd: React.FC = () => (
+  <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mx-4">
+    <div className="text-xs text-gray-500 mb-2 text-center">Advertisement</div>
+    <AdSense
+      adSlot="1234567894" // Replace with actual ad slot for forum replies
+      adFormat="rectangle"
+      className="text-center"
+      style={{ minHeight: '200px', backgroundColor: '#f9fafb' }}
+    />
+  </div>
+)
+
+export const ForumFooterAd: React.FC = () => (
+  <div className="text-center">
+    <div className="text-xs text-gray-500 mb-2">Advertisement</div>
+    <AdSense
+      adSlot="1234567897" // Replace with actual ad slot for forum footer
+      adFormat="horizontal"
+      className="text-center"
+      style={{ minHeight: '90px', backgroundColor: '#f9fafb' }}
+    />
+  </div>
 ) 

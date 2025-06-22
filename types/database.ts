@@ -437,4 +437,268 @@ export interface QueryOptions {
 export interface ListenerOptions {
   includeMetadataChanges?: boolean
   source?: 'default' | 'server' | 'cache'
-} 
+}
+
+// Community Types
+export interface ForumPost extends BaseDocument {
+  title: string
+  content: string
+  authorId: string
+  authorName: string
+  category: 'general' | 'resources' | 'local' | 'support' | 'providers'
+  tags?: string[]
+  
+  // Post status
+  isPinned?: boolean
+  isLocked?: boolean
+  isModerated?: boolean
+  status: 'active' | 'hidden' | 'deleted'
+  
+  // Engagement
+  likes: number
+  replies: number
+  views: number
+  lastActivity?: Timestamp | Date
+  
+  // Moderation
+  moderatedBy?: string
+  moderatedAt?: Timestamp | Date
+  moderationReason?: string
+  reportCount?: number
+  
+  // Location context
+  locationId?: string
+  zipCode?: string
+}
+
+export interface ForumReply extends BaseDocument {
+  postId: string
+  parentReplyId?: string // For nested replies
+  content: string
+  authorId: string
+  authorName: string
+  
+  // Reply status
+  isModerated?: boolean
+  status: 'active' | 'hidden' | 'deleted'
+  
+  // Engagement
+  likes: number
+  reportCount?: number
+  
+  // Moderation
+  moderatedBy?: string
+  moderatedAt?: Timestamp | Date
+  moderationReason?: string
+}
+
+export interface VolunteerOpportunity extends BaseDocument {
+  title: string
+  description: string
+  organization: string
+  organizationId?: string
+  
+  // Location and logistics
+  location: string
+  address?: string
+  coordinates?: Coordinates
+  isRemote?: boolean
+  
+  // Timing
+  isOngoing: boolean
+  startDate?: Timestamp | Date
+  endDate?: Timestamp | Date
+  schedule?: string
+  timeCommitment?: string
+  estimatedHours?: number
+  
+  // Requirements
+  skills?: string[]
+  requirements?: string[]
+  ageRestriction?: string
+  backgroundCheckRequired?: boolean
+  trainingRequired?: boolean
+  
+  // Capacity
+  spotsTotal?: number
+  spotsAvailable?: number
+  spotsRegistered?: number
+  
+  // Contact
+  contactEmail: string
+  contactPhone?: string
+  applicationUrl?: string
+  
+  // Status and categorization
+  status: 'active' | 'filled' | 'expired' | 'cancelled'
+  urgency: 'low' | 'normal' | 'high' | 'urgent'
+  category: 'food_distribution' | 'kitchen_help' | 'delivery' | 'events' | 'admin' | 'other'
+  
+  // Meta
+  isVerified?: boolean
+  verifiedBy?: string
+  createdBy: string
+  tags?: string[]
+}
+
+export interface CommunityEvent extends BaseDocument {
+  title: string
+  description: string
+  organization: string
+  organizationId?: string
+  
+  // Event details
+  date: Timestamp | Date
+  startTime: string
+  endTime: string
+  timezone?: string
+  
+  // Location
+  location: string
+  address: string
+  coordinates?: Coordinates
+  isVirtual?: boolean
+  virtualLink?: string
+  
+  // Event type and categorization
+  type: 'distribution' | 'meal' | 'workshop' | 'fundraiser' | 'community' | 'educational'
+  category: string
+  tags?: string[]
+  
+  // Capacity and registration
+  capacity?: number
+  registered?: number
+  registrationRequired?: boolean
+  registrationUrl?: string
+  isWaitlistEnabled?: boolean
+  
+  // Requirements
+  requirements?: string[]
+  ageRestriction?: string
+  costInfo?: string
+  materialsNeeded?: string[]
+  
+  // Contact
+  contactEmail: string
+  contactPhone?: string
+  
+  // Status
+  status: 'upcoming' | 'today' | 'ongoing' | 'completed' | 'cancelled'
+  isRecurring?: boolean
+  recurrencePattern?: string
+  
+  // Meta
+  isVerified?: boolean
+  verifiedBy?: string
+  createdBy: string
+  featuredImage?: string
+}
+
+export interface CommunityResource extends BaseDocument {
+  title: string
+  description: string
+  category: 'government' | 'local' | 'transportation' | 'family' | 'national' | 'housing' | 'healthcare' | 'education'
+  type: 'guide' | 'website' | 'document' | 'video' | 'contact'
+  
+  // Content
+  content?: string
+  url?: string
+  downloadUrl?: string
+  phoneNumber?: string
+  
+  // Metadata
+  tags?: string[]
+  language?: string
+  targetAudience?: string[]
+  difficulty?: 'beginner' | 'intermediate' | 'advanced'
+  
+  // Engagement
+  views: number
+  likes: number
+  downloads?: number
+  shares?: number
+  
+  // Author and verification
+  authorId: string
+  authorName: string
+  isVerified?: boolean
+  verifiedBy?: string
+  source?: string
+  lastUpdated?: Timestamp | Date
+  
+  // Moderation
+  isModerated?: boolean
+  status: 'active' | 'hidden' | 'deleted'
+  moderatedBy?: string
+  moderatedAt?: Timestamp | Date
+  reportCount?: number
+  
+  // Location relevance
+  isLocationSpecific?: boolean
+  applicableZipCodes?: string[]
+  applicableStates?: string[]
+}
+
+export interface CommunityEngagement extends BaseDocument {
+  userId: string
+  targetId: string // ID of post, reply, resource, etc.
+  targetType: 'post' | 'reply' | 'resource' | 'event' | 'opportunity'
+  action: 'like' | 'save' | 'share' | 'report' | 'view'
+  
+  // Additional context
+  value?: number // For ratings, etc.
+  metadata?: Record<string, any>
+}
+
+// Community Statistics
+export interface CommunityStats extends BaseDocument {
+  date: Timestamp | Date
+  period: 'daily' | 'weekly' | 'monthly'
+  
+  // Forum stats
+  postsCount: number
+  repliesCount: number
+  activeUsers: number
+  newUsers: number
+  
+  // Content stats
+  resourcesShared: number
+  eventsPosted: number
+  opportunitiesPosted: number
+  
+  // Engagement stats
+  totalViews: number
+  totalLikes: number
+  totalShares: number
+  
+  // Top content
+  topPosts?: Array<{
+    postId: string
+    title: string
+    views: number
+    replies: number
+  }>
+  
+  topResources?: Array<{
+    resourceId: string
+    title: string
+    views: number
+    likes: number
+  }>
+}
+
+// Create/Update types for community features
+export type CreateForumPostData = Omit<ForumPost, 'id' | 'createdAt' | 'updatedAt' | 'likes' | 'replies' | 'views'>
+export type UpdateForumPostData = Partial<Omit<ForumPost, 'id' | 'createdAt' | 'authorId'>>
+
+export type CreateForumReplyData = Omit<ForumReply, 'id' | 'createdAt' | 'updatedAt' | 'likes'>
+export type UpdateForumReplyData = Partial<Omit<ForumReply, 'id' | 'createdAt' | 'authorId' | 'postId'>>
+
+export type CreateVolunteerOpportunityData = Omit<VolunteerOpportunity, 'id' | 'createdAt' | 'updatedAt'>
+export type UpdateVolunteerOpportunityData = Partial<Omit<VolunteerOpportunity, 'id' | 'createdAt'>>
+
+export type CreateCommunityEventData = Omit<CommunityEvent, 'id' | 'createdAt' | 'updatedAt'>
+export type UpdateCommunityEventData = Partial<Omit<CommunityEvent, 'id' | 'createdAt'>>
+
+export type CreateCommunityResourceData = Omit<CommunityResource, 'id' | 'createdAt' | 'updatedAt' | 'views' | 'likes'>
+export type UpdateCommunityResourceData = Partial<Omit<CommunityResource, 'id' | 'createdAt' | 'authorId'>> 

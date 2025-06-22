@@ -245,10 +245,10 @@ export default async function LocationPage({ params }: LocationPageProps) {
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">community</h3>
               <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">volunteer opportunities</a></li>
+                <li><Link href="/community/volunteer" className="text-blue-600 hover:underline">volunteer opportunities</Link></li>
                 <li><a href="#" className="text-blue-600 hover:underline">donate to local organizations</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">community forums</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">resource guides</a></li>
+                <li><Link href="/community/forums" className="text-blue-600 hover:underline">community forums</Link></li>
+                <li><Link href="/community/resources" className="text-blue-600 hover:underline">resource guides</Link></li>
               </ul>
             </div>
             <div>
