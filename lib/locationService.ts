@@ -1,4 +1,15 @@
 import { LatLng, Address, LocationQueryResult } from '@/types/location'
+import type { Coordinates } from '@/types/database'
+
+/**
+ * Convert Coordinates (database type) to LatLng (location type)
+ */
+export function coordinatesToLatLng(coords: Coordinates): LatLng {
+  return {
+    lat: coords.latitude,
+    lng: coords.longitude
+  }
+}
 
 /**
  * Validates US ZIP code format (5 digits or 5-4 format)

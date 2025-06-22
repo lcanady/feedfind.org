@@ -52,7 +52,7 @@ import type {
   UpdateStatus,
   LocationSearchResult
 } from '../types/database'
-import { validateZipCode, calculateDistance } from './locationService'
+import { validateZipCode, calculateDistance, coordinatesToLatLng } from './locationService'
 
 // Base Database Service Class
 export class DatabaseService {
@@ -383,6 +383,15 @@ export class LocationService extends DatabaseService {
     return created as Location
   }
 
+  async getById(locationId: string): Promise<Location | null> {
+    try {
+      const location = await super.get('locations', locationId)
+      return location as Location | null
+    } catch (error) {
+      throw this.handleError(error)
+    }
+  }
+
   async getByProviderId(providerId: string): Promise<Location[]> {
     const results = await this.list('locations', {
       where: [{ field: 'providerId', operator: '==', value: providerId }]
@@ -434,14 +443,18 @@ export class LocationService extends DatabaseService {
     })
 
     const locationsWithDistance = results.docs
-      .map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        distance: calculateDistance(
-          coordinates,
-          doc.data().coordinates
+      .map(doc => {
+        const docData = doc.data()
+        const distance = calculateDistance(
+          coordinatesToLatLng(coordinates),
+          coordinatesToLatLng(docData.coordinates)
         )
-      }))
+        return {
+          id: doc.id,
+          ...docData,
+          distance
+        }
+      })
       .filter(location => location.distance <= radiusKm)
       .sort((a, b) => a.distance - b.distance)
 
@@ -453,19 +466,57 @@ export class LocationService extends DatabaseService {
       throw new Error('Invalid ZIP code format')
     }
 
+    // Get all active locations and filter by ZIP code in memory
+    // In a real implementation, you'd store zipCode as a separate indexed field
     const results = await this.list('locations', {
-      where: [
-        { field: 'status', operator: '==', value: 'active' },
-        { field: 'address', operator: '>=', value: zipCode },
-        { field: 'address', operator: '<=', value: zipCode + '\uf8ff' }
-      ]
+      where: [{ field: 'status', operator: '==', value: 'active' }]
     })
 
-    return results.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
-    })) as Location[]
+    const filteredLocations = results.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(location => {
+        // Extract ZIP code from address (assuming format: "Street, City, State ZIP")
+        const addressStr = location.address as string
+        const zipMatch = addressStr.match(/\b\d{5}(?:-\d{4})?\b/)
+        return zipMatch && zipMatch[0] === zipCode
+      })
+
+    return filteredLocations as Location[]
   }
+
+  async searchByText(searchText: string): Promise<Location[]> {
+    // Get all active locations and do basic text search
+    const results = await this.list('locations', {
+      where: [{ field: 'status', operator: '==', value: 'active' }]
+    })
+
+    const searchTerms = searchText.toLowerCase().split(' ')
+    
+    const filteredLocations = results.docs
+      .map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }))
+      .filter(location => {
+        const searchableText = [
+          location.name,
+          location.address,
+          location.description || ''
+        ].join(' ').toLowerCase()
+
+        // Check if any search term is found in the searchable text
+        return searchTerms.some(term => 
+          term.length > 0 && searchableText.includes(term)
+        )
+      })
+
+    return filteredLocations as Location[]
+  }
+
+
 
   async filterByStatus(filters: {
     status?: string[]
@@ -550,6 +601,47 @@ export class LocationService extends DatabaseService {
     const validStatuses = ['active', 'inactive', 'pending', 'suspended']
     if (!validStatuses.includes(data.status)) {
       throw new Error(`Invalid status: must be one of ${validStatuses.join(', ')}`)
+    }
+  }
+
+  async getRecentListings(limit: number = 10): Promise<Location[]> {
+    try {
+      const results = await this.list('locations', {
+        where: [
+          { field: 'status', operator: '==', value: 'active' }
+        ],
+        orderBy: [{ field: 'updatedAt', direction: 'desc' }],
+        limit
+      })
+
+      return results.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as Location))
+    } catch (error) {
+      console.error('Error fetching recent listings:', error)
+      throw this.handleError(error)
+    }
+  }
+
+  async testConnection(): Promise<{ connected: boolean; locationCount: number }> {
+    try {
+      console.log('Testing database connection...')
+      const results = await this.list('locations', { limit: 1 })
+      console.log('Database connection test successful')
+      
+      // Get count of all locations
+      const allResults = await this.list('locations')
+      return {
+        connected: true,
+        locationCount: allResults.docs.length
+      }
+    } catch (error) {
+      console.error('Database connection test failed:', error)
+      return {
+        connected: false,
+        locationCount: 0
+      }
     }
   }
 }
@@ -1011,4 +1103,8 @@ export class ServiceService extends DatabaseService {
       throw new Error('Description must be less than 500 characters')
     }
   }
-} 
+}
+
+// Convenience function exports
+const locationService = new LocationService()
+export const getLocationById = (id: string) => locationService.getById(id) 

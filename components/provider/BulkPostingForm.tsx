@@ -167,6 +167,7 @@ export const BulkPostingForm: React.FC = () => {
   // Handle service toggle for manual entry
   const toggleService = (locationIndex: number, serviceId: string) => {
     const location = manualLocations[locationIndex]
+    if (!location) return
     const services = location.services || []
     const updatedServices = services.includes(serviceId)
       ? services.filter(id => id !== serviceId)

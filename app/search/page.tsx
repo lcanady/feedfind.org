@@ -1,13 +1,23 @@
 'use client'
 
-import React, { useState } from 'react'
-import SearchForm from '../../components/search/SearchForm'
+import React, { useState, useEffect, Suspense } from 'react'
+import { useSearchParams } from 'next/navigation'
+import Link from 'next/link'
+import { SearchForm } from '../../components/search/SearchForm'
+import Header from '../../components/layout/Header'
+import { FooterAd } from '../../components/ui/AdSense'
 import type { LocationSearchResult } from '../../types/database'
 
-export default function SearchPage() {
+function SearchPageContent() {
   const [results, setResults] = useState<LocationSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
+  const searchParams = useSearchParams()
+
+  // Get initial query from URL parameters
+  const initialQuery = searchParams.get('q') || ''
+  const initialStatus = searchParams.get('status') || undefined
+  const initialRadius = searchParams.get('radius') || undefined
 
   const handleResults = (searchResults: LocationSearchResult[]) => {
     setResults(searchResults)
@@ -22,7 +32,9 @@ export default function SearchPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <main id="main-content" className="min-h-screen bg-gray-50">
+      <Header />
+      
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-4xl mx-auto">
           {/* Page Header */}
@@ -42,7 +54,8 @@ export default function SearchPage() {
               onResults={handleResults}
               onError={handleError}
               onLoading={handleLoading}
-              autoFocus={true}
+              initialQuery={initialQuery}
+              autoFocus={!initialQuery} // Only auto-focus if no initial query
               showFilters={true}
               className="w-full"
             />
@@ -51,7 +64,7 @@ export default function SearchPage() {
           {/* Results Section */}
           {loading && (
             <div className="text-center py-8">
-              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-trust-blue"></div>
+              <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
               <p className="mt-2 text-gray-600">Searching for locations...</p>
             </div>
           )}
@@ -135,7 +148,7 @@ export default function SearchPage() {
                           {Object.entries(result.location.operatingHours).map(([day, hours]) => (
                             <div key={day} className="flex justify-between">
                               <span className="capitalize">{day}:</span>
-                              <span>{hours.isOpen ? `${hours.open} - ${hours.close}` : 'Closed'}</span>
+                              <span>{hours && !hours.closed ? `${hours.open} - ${hours.close}` : 'Closed'}</span>
                             </div>
                           ))}
                         </div>
@@ -147,7 +160,7 @@ export default function SearchPage() {
                       {result.location.phone && (
                         <a 
                           href={`tel:${result.location.phone}`}
-                          className="text-trust-blue hover:text-blue-700 flex items-center"
+                          className="text-purple-600 hover:text-purple-700 flex items-center"
                         >
                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
@@ -161,7 +174,7 @@ export default function SearchPage() {
                           href={result.location.website}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="text-trust-blue hover:text-blue-700 flex items-center"
+                          className="text-purple-600 hover:text-purple-700 flex items-center"
                         >
                           <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -174,7 +187,7 @@ export default function SearchPage() {
                         href={`https://maps.google.com/?q=${encodeURIComponent(result.location.address)}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-trust-blue hover:text-blue-700 flex items-center"
+                        className="text-purple-600 hover:text-purple-700 flex items-center"
                       >
                         <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
@@ -213,6 +226,74 @@ export default function SearchPage() {
           )}
         </div>
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-200 bg-gray-50 mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* Non-obtrusive footer ad */}
+          <FooterAd />
+          
+          <div className="grid md:grid-cols-4 gap-6 text-sm">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">about</h3>
+              <ul className="space-y-1">
+                <li><a href="#" className="text-blue-600 hover:underline">help & FAQ</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">safety tips</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">terms of use</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">providers</h3>
+              <ul className="space-y-1">
+                <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
+                <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
+                <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
+                <li><Link href="/bulkposting" className="text-blue-600 hover:underline">bulk posting</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">community</h3>
+              <ul className="space-y-1">
+                <li><a href="#" className="text-blue-600 hover:underline">volunteer opportunities</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">donate to local organizations</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">community forums</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">resource guides</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">contact</h3>
+              <ul className="space-y-1">
+                <li><a href="#" className="text-blue-600 hover:underline">report an issue</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">suggest improvements</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">partnership inquiries</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">feedback</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
+            <p>© 2025 feedfind.org - connecting communities with food assistance resources</p>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}
+
+export default function SearchPage() {
+  return (
+    <Suspense fallback={
+      <main id="main-content" className="min-h-screen bg-gray-50">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <div className="max-w-4xl mx-auto text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+            <p className="text-gray-600">Loading search...</p>
+          </div>
+        </div>
+      </main>
+    }>
+      <SearchPageContent />
+    </Suspense>
   )
 } 

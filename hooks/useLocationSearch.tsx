@@ -4,13 +4,8 @@ import type { Location, Coordinates, LocationSearchResult } from '../types/datab
 import { calculateDistance } from '../lib/locationService'
 import type { LatLng } from '../types/location'
 
-// Helper function to convert between coordinate types
-function coordinatesToLatLng(coords: Coordinates): LatLng {
-  return {
-    lat: coords.latitude,
-    lng: coords.longitude
-  }
-}
+// Import the conversion function from the location service
+import { coordinatesToLatLng } from '../lib/locationService'
 
 export interface SearchQuery {
   type: 'zipcode' | 'address' | 'coordinates'
@@ -75,12 +70,25 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
     setLastFilters(filters)
     
     try {
+      // First test database connection
+      const connectionTest = await locationService.current.testConnection()
+      console.log('Database connection test:', connectionTest)
+      
+      if (!connectionTest.connected) {
+        throw new Error('Database connection failed')
+      }
+      
+      if (connectionTest.locationCount === 0) {
+        throw new Error('No locations found in database. Please seed the database first at /debug-seed')
+      }
+      
       let searchResults: Location[] = []
       let searchCenter: Coordinates | null = null
 
       // Execute search based on query type
       switch (query.type) {
         case 'zipcode':
+          console.log('Searching by ZIP code:', query.value)
           searchResults = await locationService.current.searchByZipCode(query.value as string)
           // For ZIP code searches, we might need to geocode to get center point
           // This is a simplified implementation - in reality you'd use Google Geocoding API
@@ -88,6 +96,7 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
           break
 
         case 'coordinates':
+          console.log('Searching by coordinates:', query.value)
           const coords = query.value as Coordinates
           searchCenter = coords
           const radius = filters.radius || 10 // Default 10km radius
@@ -100,20 +109,32 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
           break
 
         case 'address':
-          // In a real implementation, you'd use Google Geocoding API to convert address to coordinates
-          const geocoded = await geocodeAddress(query.value as string)
-          if (geocoded) {
-            searchCenter = geocoded
-            const addressRadius = filters.radius || 15 // Default 15km for address searches
-            const addressResults = await locationService.current.searchByCoordinates(geocoded, addressRadius)
-            searchResults = addressResults
-          } else {
-            throw new Error('Unable to find that address. Please try a different address or ZIP code.')
+          console.log('Searching by address/text:', query.value)
+          // Try text search first for address queries
+          searchResults = await locationService.current.searchByText(query.value as string)
+          
+          // If no results from text search, try geocoding (placeholder for now)
+          if (searchResults.length === 0) {
+            const geocoded = await geocodeAddress(query.value as string)
+            if (geocoded) {
+              searchCenter = geocoded
+              const addressRadius = filters.radius || 15 // Default 15km for address searches
+              const addressResults = await locationService.current.searchByCoordinates(geocoded, addressRadius)
+              searchResults = addressResults
+            }
           }
           break
 
         default:
           throw new Error('Invalid search type')
+      }
+
+      console.log('Search results found:', searchResults.length)
+
+      // Debug: log if no results found
+      if (searchResults.length === 0) {
+        console.log('No results found for query:', query.value)
+        console.log('Query type:', query.type)
       }
 
       // Apply additional filters
