@@ -132,12 +132,12 @@ export default function CommunityForumsPage() {
                 Connect, share, and support each other in your food assistance journey
               </p>
             </div>
-            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+            <Link href="/community/forums/new" className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
               <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
               </svg>
               New Post
-            </button>
+            </Link>
           </div>
         </div>
       </div>
@@ -229,26 +229,33 @@ export default function CommunityForumsPage() {
 
               <div className="divide-y divide-gray-200">
                 {loading ? (
-                  // Loading state
-                  Array.from({ length: 5 }).map((_, i) => (
-                    <div key={i} className="p-6 animate-pulse">
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <div className="flex items-center space-x-2 mb-2">
-                            <div className="h-4 bg-gray-200 rounded w-16"></div>
-                            <div className="h-4 bg-gray-200 rounded w-12"></div>
-                          </div>
-                          <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
-                          <div className="flex items-center space-x-4">
-                            <div className="h-4 bg-gray-200 rounded w-20"></div>
-                            <div className="h-4 bg-gray-200 rounded w-16"></div>
-                            <div className="h-4 bg-gray-200 rounded w-24"></div>
-                          </div>
-                        </div>
-                        <div className="ml-4 w-10 h-10 bg-gray-200 rounded-full"></div>
-                      </div>
+                  <>
+                    {/* Standard Loading Spinner */}
+                    <div className="p-8 text-center">
+                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                      <p className="text-gray-600">Loading forum posts...</p>
                     </div>
-                  ))
+                    {/* Skeleton Loading */}
+                    {Array.from({ length: 5 }).map((_, i) => (
+                      <div key={i} className="p-6 animate-pulse">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-2 mb-2">
+                              <div className="h-4 bg-gray-200 rounded w-16"></div>
+                              <div className="h-4 bg-gray-200 rounded w-12"></div>
+                            </div>
+                            <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
+                            <div className="flex items-center space-x-4">
+                              <div className="h-4 bg-gray-200 rounded w-20"></div>
+                              <div className="h-4 bg-gray-200 rounded w-16"></div>
+                              <div className="h-4 bg-gray-200 rounded w-24"></div>
+                            </div>
+                          </div>
+                          <div className="ml-4 w-10 h-10 bg-gray-200 rounded-full"></div>
+                        </div>
+                      </div>
+                    ))}
+                  </>
                 ) : error ? (
                   // Error state
                   <div className="p-12 text-center">

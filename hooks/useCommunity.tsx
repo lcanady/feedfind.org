@@ -3,12 +3,12 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Unsubscribe } from 'firebase/firestore'
 import {
-  forumService,
   volunteerService,
   communityEventsService,
   communityResourcesService,
   communityStatsService
 } from '../lib/communityService'
+import { forumService } from '../lib/forumService'
 import type {
   ForumPost,
   VolunteerOpportunity,
@@ -22,26 +22,20 @@ export function useForumPosts(category?: string) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchPosts = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const fetchedPosts = await forumService.getPosts(category)
-      setPosts(fetchedPosts)
-    } catch (error) {
-      console.error('Error fetching forum posts:', error)
-      setError('Failed to load forum posts')
-      setPosts([])
-    } finally {
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+
+    const unsubscribe = forumService.subscribeToForumPosts((updatedPosts) => {
+      setPosts(updatedPosts)
       setLoading(false)
-    }
+    }, category)
+
+    // Cleanup subscription on unmount or category change
+    return () => unsubscribe()
   }, [category])
 
-  useEffect(() => {
-    fetchPosts()
-  }, [fetchPosts])
-
-  return { posts, loading, error, refetch: fetchPosts }
+  return { posts, loading, error }
 }
 
 // Volunteer Opportunities Hook
