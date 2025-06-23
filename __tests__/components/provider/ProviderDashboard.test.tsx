@@ -4,14 +4,30 @@ import userEvent from '@testing-library/user-event'
 import '@testing-library/jest-dom'
 import { ProviderDashboard } from '../../../components/provider/ProviderDashboard'
 import type { Provider, Location, StatusUpdate } from '../../../types/database'
+import type { LocationService } from '../../../lib/databaseService'
+import type { CurrentLocationStatus } from '../../../types/database'
+import { axe, toHaveNoViolations } from 'jest-axe'
 
 // Import mock services
 import { mockServices } from './__mocks__/services';
 
+// Extend Jest matchers
+expect.extend(toHaveNoViolations)
+
 // Mock the database service
 jest.mock('../../../lib/databaseService', () => ({
   ProviderService: jest.fn().mockImplementation(() => mockServices.provider),
-  LocationService: jest.fn().mockImplementation(() => mockServices.location),
+  LocationService: jest.fn().mockImplementation(() => ({
+    updateStatus: jest.fn().mockResolvedValue({}),
+    getLocations: jest.fn().mockResolvedValue([
+      {
+        id: 'location1',
+        name: 'Test Location',
+        status: 'active',
+        currentStatus: 'open'
+      }
+    ])
+  })),
   StatusUpdateService: jest.fn().mockImplementation(() => mockServices.statusUpdate)
 }));
 
@@ -19,6 +35,17 @@ jest.mock('../../../lib/databaseService', () => ({
 const mockUseAuth = jest.fn()
 jest.mock('../../../hooks/useAuth', () => ({
   useAuth: () => mockUseAuth()
+}))
+
+// Mock Next.js router
+jest.mock('next/navigation', () => ({
+  useRouter: () => ({
+    push: jest.fn(),
+    replace: jest.fn(),
+    refresh: jest.fn(),
+  }),
+  useSearchParams: () => new URLSearchParams(),
+  usePathname: () => '/',
 }))
 
 // Mock data
@@ -333,6 +360,45 @@ describe('ProviderDashboard', () => {
   })
 
   describe('Status Updates', () => {
+    const getStatusButton = async (): Promise<HTMLButtonElement> => {
+      const buttons = await screen.findAllByRole('button', { name: /update status/i })
+      expect(buttons.length).toBeGreaterThan(0)
+      const button = buttons[0]
+      expect(button).toBeInTheDocument()
+      expect(button).toBeInstanceOf(HTMLButtonElement)
+      return button as HTMLButtonElement
+    }
+
+    const getFormElements = async () => {
+      const statusSelect = await waitForElement(
+        () => screen.getByLabelText(/status/i) as HTMLSelectElement
+      )
+
+      const notesInput = await waitForElement(
+        () => screen.getByLabelText(/notes/i) as HTMLInputElement
+      )
+
+      const waitTimeInput = await waitForElement(
+        () => screen.getByLabelText(/estimated wait time/i) as HTMLInputElement
+      )
+
+      const submitButton = await waitForElement(
+        () => screen.getByRole('button', { name: /update status$/i }) as HTMLButtonElement
+      )
+
+      return {
+        statusSelect,
+        notesInput,
+        waitTimeInput,
+        submitButton
+      }
+    }
+
+    beforeEach(() => {
+      // Reset all mocks before each test
+      jest.clearAllMocks()
+    })
+
     it('should provide quick status update controls', async () => {
       render(
         <ProviderDashboard 
@@ -391,7 +457,11 @@ describe('ProviderDashboard', () => {
 
     it('should handle status update submission', async () => {
       const user = userEvent.setup()
-      const { LocationService } = require('../../../lib/databaseService')
+      const mockLocationService = {
+        updateStatus: jest.fn().mockResolvedValue({}),
+      }
+      jest.spyOn(require('../../../lib/databaseService'), 'LocationService')
+        .mockImplementation(() => mockLocationService)
       
       render(
         <ProviderDashboard 
@@ -401,39 +471,102 @@ describe('ProviderDashboard', () => {
         />
       )
 
-      // Navigate to Locations tab where update status buttons are available
       await navigateToLocationsTab(user)
 
-      await waitFor(() => {
-        const statusButton = screen.getAllByRole('button', { name: /update status/i })[0]
-        expect(statusButton).toBeInTheDocument()
-      })
-
-      const statusButton = screen.getAllByRole('button', { name: /update status/i })[0]
+      const statusButton = await getStatusButton()
       await user.click(statusButton)
 
-      // Select 'closed' status
-      const closedOption = screen.getByRole('radio', { name: /closed/i })
-      await user.click(closedOption)
+      const { statusSelect, notesInput, waitTimeInput, submitButton } = await getFormElements()
 
-      // Add notes
-      const notesInput = screen.getByLabelText(/notes/i)
+      // Fill out the status update form
+      await user.selectOptions(statusSelect, 'closed')
       await user.type(notesInput, 'Temporarily closed for restocking')
-
-      // Submit update
-      const submitButton = screen.getByRole('button', { name: /update/i })
+      await user.type(waitTimeInput, '30')
       await user.click(submitButton)
 
-      expect(LocationService.prototype.updateStatus).toHaveBeenCalledWith(
-        'location1',
-        'closed',
-        expect.objectContaining({
-          notes: 'Temporarily closed for restocking',
-          updatedBy: 'provider1'
-        })
-      )
+      // Verify the update was called with correct data
+      expect(mockLocationService.updateStatus).toHaveBeenCalledWith('location1', {
+        status: 'closed',
+        notes: 'Temporarily closed for restocking',
+        estimatedWaitTime: 30,
+        updatedBy: 'provider1',
+        timestamp: expect.any(Date)
+      })
 
       expect(mockOnStatusUpdate).toHaveBeenCalledWith('location1', 'closed')
+    })
+
+    it('should handle empty estimated wait time', async () => {
+      const user = userEvent.setup()
+      const mockLocationService = {
+        updateStatus: jest.fn().mockResolvedValue({}),
+      }
+      jest.spyOn(require('../../../lib/databaseService'), 'LocationService')
+        .mockImplementation(() => mockLocationService)
+      
+      render(
+        <ProviderDashboard 
+          providerId="provider1"
+          onLocationUpdate={mockOnLocationUpdate}
+          onStatusUpdate={mockOnStatusUpdate}
+        />
+      )
+
+      await navigateToLocationsTab(user)
+
+      const statusButton = await getStatusButton()
+      await user.click(statusButton)
+
+      const { statusSelect, notesInput, submitButton } = await getFormElements()
+
+      // Fill out form without wait time
+      await user.selectOptions(statusSelect, 'open')
+      await user.type(notesInput, 'Open for service')
+      await user.click(submitButton)
+
+      // Verify update was called without estimatedWaitTime field
+      expect(mockLocationService.updateStatus).toHaveBeenCalledWith('location1', {
+        status: 'open',
+        notes: 'Open for service',
+        updatedBy: 'provider1',
+        timestamp: expect.any(Date)
+      })
+    })
+
+    it('should handle invalid wait time input', async () => {
+      const user = userEvent.setup()
+      const mockLocationService = {
+        updateStatus: jest.fn().mockResolvedValue({}),
+      }
+      jest.spyOn(require('../../../lib/databaseService'), 'LocationService')
+        .mockImplementation(() => mockLocationService)
+      
+      render(
+        <ProviderDashboard 
+          providerId="provider1"
+          onLocationUpdate={mockOnLocationUpdate}
+          onStatusUpdate={mockOnStatusUpdate}
+        />
+      )
+
+      await navigateToLocationsTab(user)
+
+      const statusButton = await getStatusButton()
+      await user.click(statusButton)
+
+      const { statusSelect, waitTimeInput, submitButton } = await getFormElements()
+
+      // Fill out form with invalid wait time
+      await user.selectOptions(statusSelect, 'limited')
+      await user.type(waitTimeInput, 'invalid')
+      await user.click(submitButton)
+
+      // Verify update was called without estimatedWaitTime field
+      expect(mockLocationService.updateStatus).toHaveBeenCalledWith('location1', {
+        status: 'limited',
+        updatedBy: 'provider1',
+        timestamp: expect.any(Date)
+      })
     })
   })
 
@@ -571,6 +704,18 @@ describe('ProviderDashboard', () => {
   })
 
   describe('Accessibility', () => {
+    it('should pass axe-core automated accessibility tests', async () => {
+      const { container } = render(
+        <ProviderDashboard 
+          providerId="provider1"
+          onLocationUpdate={mockOnLocationUpdate}
+          onStatusUpdate={mockOnStatusUpdate}
+        />
+      )
+      const results = await axe(container)
+      expect(results).toHaveNoViolations()
+    })
+
     it('should have proper heading hierarchy', async () => {
       render(
         <ProviderDashboard 
@@ -580,17 +725,16 @@ describe('ProviderDashboard', () => {
         />
       )
 
-      await waitFor(() => {
-        const mainHeading = screen.getByRole('heading', { level: 1 })
-        expect(mainHeading).toBeInTheDocument()
-        expect(mainHeading).toHaveTextContent(/dashboard/i)
+      const mainHeading = await waitForElement(
+        () => screen.getByRole('heading', { level: 1 })
+      )
+      expect(mainHeading).toHaveTextContent(/dashboard/i)
 
-        const sectionHeadings = screen.getAllByRole('heading', { level: 2 })
-        expect(sectionHeadings.length).toBeGreaterThan(0)
-      })
+      const sectionHeadings = await screen.findAllByRole('heading', { level: 2 })
+      expect(sectionHeadings.length).toBeGreaterThan(0)
     })
 
-    it('should have proper form labels and descriptions', async () => {
+    it('should support keyboard navigation', async () => {
       const user = userEvent.setup()
       
       render(
@@ -601,23 +745,107 @@ describe('ProviderDashboard', () => {
         />
       )
 
-      // Navigate to locations tab first
+      // Test tab navigation through main elements
+      await user.tab()
+      const firstInteractive = document.activeElement
+      expect(firstInteractive).toHaveAttribute('role', 'tab')
+
+      // Navigate through tabs
+      await user.keyboard('{ArrowRight}')
+      const secondTab = document.activeElement
+      expect(secondTab).toHaveAttribute('role', 'tab')
+
+      // Navigate to locations tab
       await navigateToLocationsTab(user)
 
-      await waitFor(() => {
-        const statusButton = screen.getAllByRole('button', { name: /update status/i })[0]
-        expect(statusButton).toBeInTheDocument()
-      })
-
-      const statusButton = screen.getAllByRole('button', { name: /update status/i })[0]
+      // Test focus management in status update form
+      const statusButton = await getStatusButton()
       await user.click(statusButton)
 
-      // All form inputs should have labels
-      const statusSelect = screen.getByRole('combobox', { name: /status/i })
-      expect(statusSelect).toHaveAccessibleName()
+      const { statusSelect, notesInput, waitTimeInput, submitButton } = await getFormElements()
 
-      const notesInput = screen.getByLabelText(/notes/i)
-      expect(notesInput).toBeInTheDocument()
+      // Tab through form elements
+      await user.tab()
+      expect(statusSelect).toHaveFocus()
+
+      await user.tab()
+      expect(notesInput).toHaveFocus()
+
+      await user.tab()
+      expect(waitTimeInput).toHaveFocus()
+
+      await user.tab()
+      expect(submitButton).toHaveFocus()
+    })
+
+    it('should have proper ARIA labels and roles', async () => {
+      render(
+        <ProviderDashboard 
+          providerId="provider1"
+          onLocationUpdate={mockOnLocationUpdate}
+          onStatusUpdate={mockOnStatusUpdate}
+        />
+      )
+
+      // Check for proper navigation landmarks
+      const navigation = await waitForElement(
+        () => screen.getByRole('navigation')
+      )
+      expect(navigation).toHaveAttribute('aria-label')
+
+      // Check for proper tab list
+      const tabList = await waitForElement(
+        () => screen.getByRole('tablist')
+      )
+      expect(tabList).toHaveAttribute('aria-label')
+
+      // Navigate to locations tab and check form controls
+      const user = userEvent.setup()
+      await navigateToLocationsTab(user)
+
+      const statusButton = await getStatusButton()
+      await user.click(statusButton)
+
+      const { statusSelect, notesInput, waitTimeInput } = await getFormElements()
+
+      // Check for proper form labels
+      expect(statusSelect).toHaveAccessibleName()
+      expect(notesInput).toHaveAccessibleName()
+      expect(waitTimeInput).toHaveAccessibleName()
+    })
+
+    it('should announce status changes to screen readers', async () => {
+      const user = userEvent.setup()
+      
+      render(
+        <ProviderDashboard 
+          providerId="provider1"
+          onLocationUpdate={mockOnLocationUpdate}
+          onStatusUpdate={mockOnStatusUpdate}
+        />
+      )
+
+      await navigateToLocationsTab(user)
+
+      // Check for status live region
+      const statusRegion = await waitForElement(
+        () => screen.getByRole('status')
+      )
+      expect(statusRegion).toHaveAttribute('aria-live', 'polite')
+
+      // Update status and verify announcement
+      const statusButton = await getStatusButton()
+      await user.click(statusButton)
+
+      const { statusSelect, submitButton } = await getFormElements()
+      await user.selectOptions(statusSelect, 'closed')
+      await user.click(submitButton)
+
+      // Verify status update announcement
+      const announcement = await waitForElement(
+        () => screen.getByText(/status updated/i)
+      )
+      expect(announcement).toBeInTheDocument()
     })
   })
 

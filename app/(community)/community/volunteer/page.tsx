@@ -4,22 +4,18 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { useVolunteerOpportunities } from '@/hooks/useCommunity'
+import { HeaderAd, SidebarAd, AdSense } from '@/components/ui/AdSense'
+import { formatDistanceToNow } from 'date-fns'
+import { Timestamp } from 'firebase/firestore'
 
 export default function VolunteerPage() {
   const [filter, setFilter] = useState<string>('all')
   const { opportunities, loading, error } = useVolunteerOpportunities(filter)
 
-  const formatTimeAgo = (date: Date) => {
-    const now = new Date()
-    const diffInDays = Math.floor((now.getTime() - date.getTime()) / (1000 * 60 * 60 * 24))
-    
-    if (diffInDays === 0) return 'Today'
-    if (diffInDays === 1) return '1 day ago'
-    if (diffInDays < 7) return `${diffInDays} days ago`
-    
-    const diffInWeeks = Math.floor(diffInDays / 7)
-    if (diffInWeeks === 1) return '1 week ago'
-    return `${diffInWeeks} weeks ago`
+  const formatDate = (timestamp: Timestamp | Date | undefined) => {
+    if (!timestamp) return 'Recently'
+    const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp
+    return formatDistanceToNow(date, { addSuffix: true })
   }
 
   const getUrgencyColor = (urgency: string) => {
@@ -54,8 +50,8 @@ export default function VolunteerPage() {
 
   return (
     <main id="main-content" className="min-h-screen bg-white">
-      {/* Header */}
       <Header />
+      
       {/* Header */}
       <div className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 py-8">
@@ -69,6 +65,11 @@ export default function VolunteerPage() {
             Make a difference in your community by volunteering with local food assistance organizations. 
             Whether you have a few hours a week or want to help with special events, there's an opportunity for you.
           </p>
+        </div>
+        
+        {/* Top Banner Ad */}
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          <HeaderAd />
         </div>
       </div>
 
@@ -122,6 +123,11 @@ export default function VolunteerPage() {
               </div>
             </div>
 
+            {/* Sidebar Ad */}
+            <div className="mb-6">
+              <SidebarAd />
+            </div>
+
             {/* Volunteer Benefits */}
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-3">Why Volunteer?</h3>
@@ -152,109 +158,144 @@ export default function VolunteerPage() {
 
           {/* Main Content */}
           <div className="lg:col-span-3">
-            {/* Call to Action for Organizations */}
-            <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
-              <div className="flex items-start space-x-4">
-                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
-                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                  </svg>
-                </div>
-                <div className="flex-1">
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Post a Volunteer Opportunity</h3>
-                  <p className="text-gray-600 mb-4">
-                    Are you a food assistance organization looking for volunteers? Post your opportunities to reach motivated community members.
-                  </p>
-                  <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">
-                    Post Opportunity
-                  </button>
-                </div>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                <p className="mt-4 text-gray-600">Loading opportunities...</p>
               </div>
-            </div>
-
-            {/* Opportunities List */}
-            <div className="space-y-6">
-              {opportunities.map((opportunity) => (
-                <div key={opportunity.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
+            ) : error ? (
+              <div className="text-center py-12">
+                <div className="text-red-600 mb-2">Error loading opportunities</div>
+                <p className="text-gray-600">{error}</p>
+              </div>
+            ) : opportunities.length === 0 ? (
+              <div className="text-center py-12">
+                <p className="text-gray-600">No opportunities found with the selected filter.</p>
+              </div>
+            ) : (
+              <>
+                {/* Call to Action for Organizations */}
+                <div className="bg-green-50 border border-green-200 rounded-lg p-6 mb-8">
+                  <div className="flex items-start space-x-4">
+                    <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center flex-shrink-0">
+                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                      </svg>
+                    </div>
                     <div className="flex-1">
-                      <div className="flex items-center space-x-3 mb-2">
-                        <Link href={`/community/volunteer/${opportunity.id}`}>
-                          <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 cursor-pointer">{opportunity.title}</h3>
-                        </Link>
-                        <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(opportunity.urgency)}`}>
-                          {getUrgencyLabel(opportunity.urgency)}
-                        </span>
-                      </div>
-                      <div className="flex items-center text-sm text-gray-600 space-x-4 mb-3">
-                        <span className="flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                          </svg>
-                          {opportunity.organization}
-                        </span>
-                        <span className="flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                          </svg>
-                          {opportunity.location}
-                        </span>
-                        <span className="flex items-center">
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          {opportunity.timeCommitment}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      Posted {formatTimeAgo(opportunity.createdAt instanceof Date ? opportunity.createdAt : opportunity.createdAt.toDate())}
-                    </div>
-                  </div>
-
-                  <p className="text-gray-600 mb-4">{opportunity.description}</p>
-
-                  {/* Skills */}
-                  {opportunity.skills && opportunity.skills.length > 0 && (
-                    <div className="mb-4">
-                      <h4 className="text-sm font-medium text-gray-900 mb-2">Skills & Requirements:</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {opportunity.skills.map((skill, index) => (
-                          <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-100 text-gray-800">
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Actions */}
-                  <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                    <a 
-                      href={`mailto:${opportunity.contactEmail}?subject=Volunteer Interest: ${opportunity.title}`}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Contact Organization
-                    </a>
-                    <div className="flex items-center space-x-4 text-sm text-gray-500">
-                      <button className="hover:text-blue-600">
-                        <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                        </svg>
-                        Save
-                      </button>
-                      <button className="hover:text-blue-600">
-                        <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                        </svg>
-                        Share
-                      </button>
+                      <h3 className="text-lg font-semibold text-gray-900 mb-2">Post a Volunteer Opportunity</h3>
+                      <p className="text-gray-600 mb-4">
+                        Are you a food assistance organization looking for volunteers? Post your opportunities to reach motivated community members.
+                      </p>
+                      <Link
+                        href="/community/volunteer/post"
+                        className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-green-600 hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      >
+                        Post Opportunity
+                      </Link>
                     </div>
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* Opportunities List */}
+                <div className="space-y-6">
+                  {opportunities.map((opportunity, index) => (
+                    <React.Fragment key={opportunity.id}>
+                      <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                        <div className="flex items-start justify-between mb-4">
+                          <div className="flex-1">
+                            <div className="flex items-center space-x-3 mb-2">
+                              <Link href={`/community/volunteer/${opportunity.id}`}>
+                                <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 cursor-pointer">{opportunity.title}</h3>
+                              </Link>
+                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(opportunity.urgency)}`}>
+                                {getUrgencyLabel(opportunity.urgency)}
+                              </span>
+                            </div>
+                            <div className="flex items-center text-sm text-gray-600 space-x-4 mb-3">
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                                </svg>
+                                {opportunity.organization}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                                </svg>
+                                {opportunity.location}
+                              </span>
+                              <span className="flex items-center">
+                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                {opportunity.timeCommitment}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            Posted {formatDate(opportunity.createdAt)}
+                          </div>
+                        </div>
+
+                        <p className="text-gray-600 mb-4">{opportunity.description}</p>
+
+                        {/* Skills */}
+                        {opportunity.skills && opportunity.skills.length > 0 && (
+                          <div className="mb-4">
+                            <h4 className="text-sm font-medium text-gray-900 mb-2">Skills & Requirements:</h4>
+                            <div className="flex flex-wrap gap-2">
+                              {opportunity.skills.map((skill, index) => (
+                                <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-100 text-gray-800">
+                                  {skill}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Actions */}
+                        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                          <a 
+                            href={`mailto:${opportunity.contactEmail}?subject=Volunteer Interest: ${opportunity.title}`}
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                          >
+                            Contact Organization
+                          </a>
+                          <div className="flex items-center space-x-4 text-sm text-gray-500">
+                            <button className="hover:text-blue-600">
+                              <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                              </svg>
+                              Save
+                            </button>
+                            <button className="hover:text-blue-600">
+                              <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
+                              </svg>
+                              Share
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* In-feed Ad */}
+                      {(index + 1) % 3 === 0 && index < opportunities.length - 1 && (
+                        <div className="py-4">
+                          <AdSense
+                            adSlot="1234567897"
+                            adFormat="horizontal"
+                            className="text-center"
+                            style={{ minHeight: '90px', backgroundColor: '#f9fafb' }}
+                          />
+                        </div>
+                      )}
+                    </React.Fragment>
+                  ))}
+                </div>
+              </>
+            )}
 
             {/* Load More */}
             <div className="text-center mt-8">

@@ -2,6 +2,7 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react'
 import { MarkerClusterer } from '@googlemaps/markerclusterer'
+import { useGoogleMaps } from '@/hooks/useGoogleMaps'
 import type { LocationSearchResult, Coordinates } from '../../types/database'
 
 export interface LocationMapProps {
@@ -148,8 +149,10 @@ export const LocationMap: React.FC<LocationMapProps> = ({
   const [showListView, setShowListView] = useState(false)
   const [isMapLoaded, setIsMapLoaded] = useState(false)
   
-  // Check if Google Maps is available
-  const isGoogleMapsAvailable = typeof window !== 'undefined' && window.google && window.google.maps
+  // Use Google Maps hook
+  const { isLoaded: isGoogleMapsAvailable, isLoading: isMapsLoading, error: mapsLoadError, reload: reloadMaps } = useGoogleMaps({
+    libraries: ['marker']
+  })
 
   // Check for reduced motion preference
   const prefersReducedMotion = useMemo(() => {
@@ -180,6 +183,17 @@ export const LocationMap: React.FC<LocationMapProps> = ({
 
   // Initialize map
   useEffect(() => {
+    if (isMapsLoading) {
+      // Still loading, don't show error yet
+      setMapError('')
+      return
+    }
+
+    if (mapsLoadError) {
+      setMapError(mapsLoadError)
+      return
+    }
+
     if (!isGoogleMapsAvailable || !mapRef.current) {
       setMapError('Google Maps is not available. Please check your internet connection.')
       return
@@ -232,7 +246,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
     }
 
     return cleanup
-  }, [isGoogleMapsAvailable, userLocation, showMapTypeControl, showZoomControl, prefersReducedMotion, onMapLoad, cleanup])
+  }, [isGoogleMapsAvailable, isMapsLoading, mapsLoadError, userLocation, showMapTypeControl, showZoomControl, prefersReducedMotion, onMapLoad, cleanup])
 
   // Update markers when locations change
   useEffect(() => {
@@ -311,6 +325,18 @@ export const LocationMap: React.FC<LocationMapProps> = ({
   // Handle list view toggle
   const toggleView = () => {
     setShowListView(!showListView)
+  }
+
+  // Render loading state
+  if (isMapsLoading) {
+    return (
+      <div className={`${className} flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg`} style={{ height }}>
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading Google Maps...</p>
+        </div>
+      </div>
+    )
   }
 
   // Render error state

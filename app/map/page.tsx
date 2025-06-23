@@ -6,38 +6,177 @@ import SearchForm from '../../components/search/SearchForm'
 import { useLocationSearch } from '../../hooks/useLocationSearch'
 import type { LocationSearchResult } from '../../types/database'
 
+// Demo data as fallback when database is empty - Salem, Oregon area
+const demoLocations: LocationSearchResult[] = [
+  {
+    location: {
+      id: 'demo-1',
+      name: 'Marion-Polk Food Share',
+      address: '1660 Salem Industrial Dr NE, Salem, OR 97301',
+      coordinates: { latitude: 44.9526, longitude: -123.0351 },
+      phone: '(555) 123-4567',
+      website: 'https://example.com',
+      description: 'Serving the community with fresh food and pantry items.',
+      providerId: 'demo-provider-1',
+      status: 'active' as const,
+      createdAt: new Date(),
+      operatingHours: {
+        monday: { open: '09:00', close: '17:00' },
+        tuesday: { open: '09:00', close: '17:00' },
+        wednesday: { open: '09:00', close: '17:00' },
+        thursday: { open: '09:00', close: '17:00' },
+        friday: { open: '09:00', close: '17:00' },
+        saturday: { open: '10:00', close: '14:00' },
+        sunday: { open: '', close: '', closed: true }
+      }
+    },
+    currentStatus: 'open' as const,
+    distance: 0.5,
+    rating: 4.5,
+    reviewCount: 23,
+    provider: { id: 'demo-provider-1' } as any,
+    services: []
+  },
+  {
+    location: {
+      id: 'demo-2',
+      name: 'Union Gospel Mission',
+      address: '3045 Commercial St SE, Salem, OR 97302',
+      coordinates: { latitude: 44.9311, longitude: -123.0262 },
+      phone: '(555) 987-6543',
+      description: 'Hot meals served daily to those in need.',
+      providerId: 'demo-provider-2',
+      status: 'active' as const,
+      createdAt: new Date(),
+      operatingHours: {
+        monday: { open: '11:00', close: '15:00' },
+        tuesday: { open: '11:00', close: '15:00' },
+        wednesday: { open: '11:00', close: '15:00' },
+        thursday: { open: '11:00', close: '15:00' },
+        friday: { open: '11:00', close: '15:00' },
+        saturday: { open: '', close: '', closed: true },
+        sunday: { open: '12:00', close: '16:00' }
+      }
+    },
+    currentStatus: 'limited' as const,
+    distance: 0.8,
+    rating: 4.2,
+    reviewCount: 18,
+    provider: { id: 'demo-provider-2' } as any,
+    services: []
+  },
+  {
+    location: {
+      id: 'demo-3',
+      name: 'Salem Harvest',
+      address: '1234 Center St NE, Salem, OR 97301',
+      coordinates: { latitude: 44.9429, longitude: -123.0307 },
+      phone: '(555) 456-7890',
+      description: 'Emergency food assistance available by appointment.',
+      providerId: 'demo-provider-3',
+      status: 'active' as const,
+      createdAt: new Date(),
+      operatingHours: {
+        monday: { open: '', close: '', closed: true },
+        tuesday: { open: '14:00', close: '18:00' },
+        wednesday: { open: '14:00', close: '18:00' },
+        thursday: { open: '14:00', close: '18:00' },
+        friday: { open: '', close: '', closed: true },
+        saturday: { open: '09:00', close: '12:00' },
+        sunday: { open: '', close: '', closed: true }
+      }
+    },
+    currentStatus: 'closed' as const,
+    distance: 1.2,
+    rating: 4.0,
+    reviewCount: 12,
+    provider: { id: 'demo-provider-3' } as any,
+    services: []
+  }
+]
+
 export default function MapPage() {
-  const { loading, error, results } = useLocationSearch()
+  const { loading, error, results, searchLocations } = useLocationSearch()
   const [selectedLocation, setSelectedLocation] = useState<LocationSearchResult | null>(null)
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | undefined>()
+  const [useDemoData, setUseDemoData] = useState(false)
+  
+  // Use demo data if there's an error or no results from the database
+  const displayLocations = useDemoData || (error && error.includes('No locations found in database')) ? demoLocations : results
 
-  // Get user's location on mount
+  // Get user's location on mount and search for nearby locations
   useEffect(() => {
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          setUserLocation({
+          const coords = {
             latitude: position.coords.latitude,
             longitude: position.coords.longitude
+          }
+          setUserLocation(coords)
+          
+          // Automatically search for nearby locations
+          searchLocations({
+            type: 'coordinates',
+            value: coords
+          }, {
+            radius: 25 // 25km radius
+          }).catch(() => {
+            // If search fails, fall back to demo data
+            setUseDemoData(true)
           })
         },
         (error) => {
           console.warn('Could not get user location:', error)
+          
+          // If geolocation fails, try Salem, Oregon as default
+          const defaultCoords = { latitude: 44.9429, longitude: -123.0307 }
+          setUserLocation(defaultCoords)
+          
+          searchLocations({
+            type: 'coordinates',
+            value: defaultCoords
+          }, {
+            radius: 50 // Larger radius for default location
+          }).catch(() => {
+            // If search fails, fall back to demo data
+            setUseDemoData(true)
+          })
         }
       )
+    } else {
+      // If geolocation is not available, use Salem, Oregon as default
+      const defaultCoords = { latitude: 44.9429, longitude: -123.0307 }
+      setUserLocation(defaultCoords)
+      
+                searchLocations({
+            type: 'coordinates',
+            value: defaultCoords
+          }, {
+            radius: 50
+          }).catch(() => {
+            // If search fails, fall back to demo data
+            setUseDemoData(true)
+          })
     }
-  }, [])
+  }, [searchLocations])
 
-  const handleResults = (_searchResults: LocationSearchResult[]) => {
-    // Results are handled by the hook
+  const handleResults = (searchResults: LocationSearchResult[]) => {
+    // Results are automatically handled by the hook, but we could add additional logic here
+    console.log('Search results received:', searchResults.length, 'locations')
   }
 
-  const handleError = (_errorMessage: string) => {
-    // Error is handled by the hook
+  const handleError = (errorMessage: string) => {
+    console.error('Search error:', errorMessage)
+    
+    // If it's a database error, provide helpful guidance
+    if (errorMessage.includes('Database connection failed') || errorMessage.includes('No locations found in database')) {
+      console.log('Database needs to be seeded. Visit /debug-seed to add test data.')
+    }
   }
 
-  const handleLoading = (_isLoading: boolean) => {
-    // Loading is handled by the hook
+  const handleLoading = (isLoading: boolean) => {
+    console.log('Loading state:', isLoading)
   }
 
   const handleLocationSelect = (location: LocationSearchResult) => {
@@ -89,19 +228,51 @@ export default function MapPage() {
                 </div>
               )}
               
+              {useDemoData && (
+                <div className="p-4 bg-amber-50 border-b border-amber-200">
+                  <div className="flex items-center">
+                    <svg className="w-4 h-4 text-amber-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-amber-700 text-sm">
+                      <span>Showing demo data - Salem, Oregon area locations.</span>
+                      <a 
+                        href="/debug-seed" 
+                        className="ml-2 underline hover:no-underline"
+                      >
+                        Seed database for real data
+                      </a>
+                    </div>
+                  </div>
+                </div>
+              )}
+              
               {error && (
                 <div className="p-4 bg-red-50 border-b border-red-200">
                   <div className="flex items-center">
                     <svg className="w-4 h-4 text-red-600 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <span className="text-red-700 text-sm">{error}</span>
+                    <div className="text-red-700 text-sm">
+                      <span>{error}</span>
+                      {(error.includes('Database connection failed') || error.includes('No locations found in database')) && (
+                        <div className="mt-2">
+                          <p>The database appears to be empty. To add test data:</p>
+                          <a 
+                            href="/debug-seed" 
+                            className="inline-block mt-1 px-3 py-1 bg-red-600 text-white text-xs rounded hover:bg-red-700"
+                          >
+                            Seed Database
+                          </a>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
               )}
               
               <LocationMap
-                locations={results}
+                locations={displayLocations}
                 onLocationSelect={handleLocationSelect}
                 userLocation={userLocation}
                 enableClustering={true}
@@ -206,57 +377,9 @@ export default function MapPage() {
                     <div>
                       <h4 className="font-medium text-gray-900 mb-2">Operating Hours</h4>
                       <div className="bg-gray-50 rounded-lg p-3">
-                        <div className="space-y-1">
-                          {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
-                            const dayHours = selectedLocation.location.operatingHours?.[day as keyof typeof selectedLocation.location.operatingHours]
-                            if (day === 'specialHours') return null
-                            
-                            const isToday = day === ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]
-                            const dayLabels: Record<string, string> = {
-                              monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
-                              thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
-                            }
-                            
-                            const formatTime = (time: string) => {
-                              if (time.includes('AM') || time.includes('PM')) return time
-                              const [hours, minutes] = time.split(':')
-                              const hour = parseInt(hours)
-                              const ampm = hour >= 12 ? 'PM' : 'AM'
-                              const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                              return `${displayHour}:${minutes} ${ampm}`
-                            }
-                            
-                            // Type guard to check if dayHours is a day schedule object
-                            const isDaySchedule = dayHours && typeof dayHours === 'object' && 'open' in dayHours && 'close' in dayHours
-                            const isDayOpen = isDaySchedule && !dayHours.closed && dayHours.open && dayHours.close
-                            
-                            return (
-                              <div 
-                                key={day} 
-                                className={`flex justify-between items-center py-1 px-2 rounded ${
-                                  isToday ? 'bg-blue-100 border-l-2 border-blue-500' : ''
-                                }`}
-                              >
-                                <span className={`text-sm capitalize ${
-                                  isToday ? 'font-semibold text-blue-900' : 'text-gray-700'
-                                }`}>
-                                  {dayLabels[day]}
-                                  {isToday && <span className="ml-1 text-xs text-blue-600">(Today)</span>}
-                                </span>
-                                <span className={`text-sm ${
-                                  isDayOpen 
-                                    ? (isToday ? 'font-semibold text-green-800' : 'text-gray-900')
-                                    : (isToday ? 'font-semibold text-red-800' : 'text-gray-500')
-                                }`}>
-                                  {isDayOpen && isDaySchedule
-                                    ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`
-                                    : 'Closed'
-                                  }
-                                </span>
-                              </div>
-                            )
-                          })}
-                        </div>
+                        <p className="text-sm text-gray-600">
+                          Check with location for current operating hours
+                        </p>
                       </div>
                     </div>
                   )}

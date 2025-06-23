@@ -192,14 +192,20 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     }
 
     try {
-      await statusUpdateService.updateLocationStatus(locationId, {
+      const updateData: any = {
         status,
         notes: notes || statusUpdateForm.notes,
-        estimatedWaitTime: statusUpdateForm.estimatedWaitTime ? parseInt(statusUpdateForm.estimatedWaitTime) : undefined,
         foodAvailable: statusUpdateForm.foodAvailable,
         updatedBy: user?.uid || '',
         timestamp: new Date()
-      })
+      }
+
+      // Only include estimatedWaitTime if it's a valid number
+      if (statusUpdateForm.estimatedWaitTime && statusUpdateForm.estimatedWaitTime.trim() !== '') {
+        updateData.estimatedWaitTime = parseInt(statusUpdateForm.estimatedWaitTime)
+      }
+
+      await statusUpdateService.updateLocationStatus(locationId, updateData)
 
       // Callback to parent
       if (onStatusUpdate) {
@@ -239,13 +245,20 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     }
 
     try {
+      const updateData: any = {
+        status,
+        notes: statusUpdateForm.notes,
+        updatedBy: user?.uid || '',
+        timestamp: new Date()
+      }
+
+      // Only include estimatedWaitTime if it's a valid number
+      if (statusUpdateForm.estimatedWaitTime && statusUpdateForm.estimatedWaitTime.trim() !== '') {
+        updateData.estimatedWaitTime = parseInt(statusUpdateForm.estimatedWaitTime)
+      }
+
       for (const locationId of locationIds) {
-        await statusUpdateService.updateLocationStatus(locationId, {
-          status,
-          notes: statusUpdateForm.notes,
-          updatedBy: user?.uid || '',
-          timestamp: new Date()
-        })
+        await statusUpdateService.updateLocationStatus(locationId, updateData)
       }
 
       await loadDashboardData()

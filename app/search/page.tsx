@@ -6,21 +6,42 @@ import Link from 'next/link'
 import { Suspense as ReactSuspense } from 'react'
 import Header from '../../components/layout/Header'
 import { MainSearchForm } from '../../components/search/MainSearchForm'
+import MapViewToggle from '../../components/search/MapViewToggle'
 import { FooterAd } from '../../components/ui/AdSense'
 import type { LocationSearchResult } from '../../types/database'
-import { OperatingHours } from '@/components/ui/OperatingHours'
+
 import { AdSense, HeaderAd, SidebarAd, FooterAd as FooterAdComponent } from '@/components/ui/AdSense'
 
 function SearchPageContent() {
   const [results, setResults] = useState<LocationSearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string>('')
+  const [showMap, setShowMap] = useState(false)
+  const [selectedLocation, setSelectedLocation] = useState<LocationSearchResult | null>(null)
+  const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | undefined>()
   const searchParams = useSearchParams()
 
   // Get initial query from URL parameters
   const initialQuery = searchParams.get('q') || ''
   const initialStatus = searchParams.get('status') || undefined
   const initialRadius = searchParams.get('radius') || undefined
+
+  // Get user's location on mount
+  useEffect(() => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          setUserLocation({
+            latitude: position.coords.latitude,
+            longitude: position.coords.longitude
+          })
+        },
+        (error) => {
+          console.warn('Could not get user location:', error)
+        }
+      )
+    }
+  }, [])
 
   const handleResults = (searchResults: LocationSearchResult[]) => {
     setResults(searchResults)
@@ -32,6 +53,16 @@ function SearchPageContent() {
 
   const handleLoading = (isLoading: boolean) => {
     setLoading(isLoading)
+  }
+
+  const handleLocationSelect = (location: LocationSearchResult) => {
+    setSelectedLocation(location)
+    // Navigate to location details page
+    window.location.href = `/location/${location.location.id}`
+  }
+
+  const handleToggleMap = () => {
+    setShowMap(!showMap)
   }
 
   return (
@@ -53,15 +84,7 @@ function SearchPageContent() {
 
           {/* Search Form */}
           <div className="bg-white rounded-lg shadow-lg p-6 mb-8">
-            <MainSearchForm
-              onResults={handleResults}
-              onError={handleError}
-              onLoading={handleLoading}
-              initialQuery={initialQuery}
-              autoFocus={!initialQuery} // Only auto-focus if no initial query
-              showFilters={true}
-              className="w-full"
-            />
+            <MainSearchForm />
           </div>
 
           {/* Results Section */}
@@ -85,11 +108,17 @@ function SearchPageContent() {
 
           {results.length > 0 && (
             <div className="space-y-4">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Found {results.length} location{results.length !== 1 ? 's' : ''}
-              </h2>
+              {/* Map View Toggle */}
+              <MapViewToggle
+                results={results}
+                showMap={showMap}
+                onToggleMap={handleToggleMap}
+                onLocationSelect={handleLocationSelect}
+                userLocation={userLocation}
+              />
               
-              <div className="grid gap-6">
+                             {!showMap && (
+                <div className="grid gap-6">
                 {results.map((result, index) => (
                   <div key={result.location.id || index} className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
                     <div className="flex justify-between items-start mb-4">
@@ -268,6 +297,7 @@ function SearchPageContent() {
                   </div>
                 ))}
               </div>
+              )}
             </div>
           )}
 
