@@ -27,7 +27,8 @@ import {
   CreateVolunteerOpportunityData,
   CreateCommunityEventData,
   CreateCommunityResourceData,
-  UpdateVolunteerOpportunityData
+  UpdateVolunteerOpportunityData,
+  UpdateCommunityEventData
 } from '../types/database'
 
 // Base Database Service
@@ -122,6 +123,7 @@ export class VolunteerService extends DatabaseService {
         updatedAt: serverTimestamp(),
         status: 'active',
         spotsRegistered: 0,
+        spotsAvailable: data.spotsTotal || undefined,
         registrations: {}
       })
       return docRef.id
@@ -161,24 +163,29 @@ export class VolunteerService extends DatabaseService {
           throw new Error('Already registered for this opportunity')
         }
 
+        const currentRegistered = data.spotsRegistered || 0
+
         // Check if spots are available
-        if (data.spotsTotal && data.spotsRegistered && data.spotsRegistered >= data.spotsTotal) {
+        if (data.spotsTotal && currentRegistered >= data.spotsTotal) {
           throw new Error('No spots available')
         }
 
-        // Update registrations
+        // Update registration count and available spots
+        const newRegistered = currentRegistered + 1
+        const newAvailable = data.spotsTotal ? data.spotsTotal - newRegistered : undefined
+
         transaction.update(docRef, {
           [`registrations.${userId}`]: {
             registeredAt: serverTimestamp(),
             status: 'pending'
           },
-          spotsRegistered: (data.spotsRegistered || 0) + 1,
-          spotsAvailable: data.spotsTotal ? data.spotsTotal - ((data.spotsRegistered || 0) + 1) : undefined,
+          spotsRegistered: newRegistered,
+          spotsAvailable: newAvailable,
           updatedAt: serverTimestamp()
         })
       })
     } catch (error) {
-      console.error('Error registering for volunteer opportunity:', error)
+      console.error('Error registering for opportunity:', error)
       throw error
     }
   }
@@ -200,16 +207,22 @@ export class VolunteerService extends DatabaseService {
           throw new Error('Not registered for this opportunity')
         }
 
-        // Update registrations
-        transaction.update(docRef, {
+        const currentRegistered = data.spotsRegistered || 0
+        const newRegistered = Math.max(0, currentRegistered - 1)
+        const newAvailable = data.spotsTotal ? data.spotsTotal - newRegistered : undefined
+
+        // Remove registration and update counts
+        const updates: any = {
           [`registrations.${userId}`]: deleteField(),
-          spotsRegistered: Math.max(0, (data.spotsRegistered || 1) - 1),
-          spotsAvailable: data.spotsTotal ? data.spotsTotal - Math.max(0, (data.spotsRegistered || 1) - 1) : undefined,
+          spotsRegistered: newRegistered,
+          spotsAvailable: newAvailable,
           updatedAt: serverTimestamp()
-        })
+        }
+
+        transaction.update(docRef, updates)
       })
     } catch (error) {
-      console.error('Error canceling volunteer registration:', error)
+      console.error('Error canceling registration:', error)
       throw error
     }
   }
@@ -303,20 +316,135 @@ export class CommunityEventsService extends DatabaseService {
   }
 
   async create(data: CreateCommunityEventData): Promise<string> {
-    return this.createDoc<CreateCommunityEventData>(data)
+    try {
+      const docRef = await addDoc(collection(db, this.collectionName), {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'active',
+        registered: 0,
+        availableSlots: data.capacity || undefined
+      })
+      return docRef.id
+    } catch (error) {
+      console.error('Error creating community event:', error)
+      throw error
+    }
   }
 
   async getEvent(id: string): Promise<CommunityEvent | null> {
     return this.getDoc<CommunityEvent>(id)
   }
 
+  async update(id: string, data: UpdateCommunityEventData): Promise<void> {
+    const docRef = doc(db, this.collectionName, id)
+    await updateDoc(docRef, {
+      ...data,
+      updatedAt: serverTimestamp()
+    })
+  }
+
+  async delete(id: string): Promise<void> {
+    const docRef = doc(db, this.collectionName, id)
+    await updateDoc(docRef, {
+      status: 'deleted',
+      eventStatus: 'cancelled',
+      updatedAt: serverTimestamp()
+    })
+  }
+
+  async register(eventId: string, userId: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, eventId)
+      
+      await runTransaction(db, async (transaction) => {
+        const eventDoc = await transaction.get(docRef)
+        if (!eventDoc.exists()) {
+          throw new Error('Event not found')
+        }
+
+        const data = eventDoc.data() as CommunityEvent
+        
+        // Check if spots are available
+        if (data.capacity && data.registered >= data.capacity) {
+          throw new Error('No spots available')
+        }
+
+        // Update registration count and available slots
+        transaction.update(docRef, {
+          registered: (data.registered || 0) + 1,
+          availableSlots: data.capacity ? data.capacity - ((data.registered || 0) + 1) : undefined,
+          updatedAt: serverTimestamp()
+        })
+      })
+    } catch (error) {
+      console.error('Error registering for event:', error)
+      throw error
+    }
+  }
+
+  async cancelRegistration(eventId: string, userId: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, eventId)
+      
+      await runTransaction(db, async (transaction) => {
+        const eventDoc = await transaction.get(docRef)
+        if (!eventDoc.exists()) {
+          throw new Error('Event not found')
+        }
+
+        const data = eventDoc.data() as CommunityEvent
+        
+        // Update registration count and available slots
+        transaction.update(docRef, {
+          registered: Math.max(0, (data.registered || 1) - 1),
+          availableSlots: data.capacity ? data.capacity - Math.max(0, (data.registered || 1) - 1) : undefined,
+          updatedAt: serverTimestamp()
+        })
+      })
+    } catch (error) {
+      console.error('Error canceling event registration:', error)
+      throw error
+    }
+  }
+
   subscribeToEvents(callback: (events: CommunityEvent[]) => void): Unsubscribe {
     const constraints: QueryConstraint[] = [
       where('status', '==', 'active'),
-      orderBy('startDate', 'asc'),
-      where('startDate', '>=', Timestamp.fromDate(new Date()))
+      orderBy('startDate', 'asc')
     ]
-    return this.subscribeToCollection<CommunityEvent>(callback, constraints)
+
+    const processEvents = (events: CommunityEvent[]): CommunityEvent[] => {
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const now = new Date()
+      const nowInUserTz = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }))
+
+      return events.map(event => {
+        const startDate = event.startDate instanceof Timestamp ? event.startDate.toDate() : event.startDate
+        const endDate = event.endDate instanceof Timestamp ? event.endDate.toDate() : event.endDate
+        
+        const startInUserTz = new Date(startDate.toLocaleString('en-US', { timeZone: userTimezone }))
+        const endInUserTz = new Date(endDate.toLocaleString('en-US', { timeZone: userTimezone }))
+
+        let eventStatus: 'upcoming' | 'ongoing' | 'completed'
+        if (startInUserTz > nowInUserTz) {
+          eventStatus = 'upcoming'
+        } else if (endInUserTz > nowInUserTz) {
+          eventStatus = 'ongoing'
+        } else {
+          eventStatus = 'completed'
+        }
+
+        return {
+          ...event,
+          eventStatus
+        }
+      })
+    }
+
+    return this.subscribeToCollection<CommunityEvent>((events) => {
+      callback(processEvents(events))
+    }, constraints)
   }
 }
 
@@ -327,19 +455,134 @@ export class CommunityResourcesService extends DatabaseService {
   }
 
   async create(data: CreateCommunityResourceData): Promise<string> {
-    return this.createDoc<CreateCommunityResourceData>(data)
+    try {
+      const docRef = await addDoc(collection(db, this.collectionName), {
+        ...data,
+        views: 0,
+        likes: 0,
+        shares: 0,
+        status: 'active',
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp()
+      })
+      return docRef.id
+    } catch (error) {
+      console.error('Error creating community resource:', error)
+      throw error
+    }
   }
 
   async getResource(id: string): Promise<CommunityResource | null> {
     return this.getDoc<CommunityResource>(id)
   }
 
-  subscribeToResources(callback: (resources: CommunityResource[]) => void): Unsubscribe {
+  async incrementViews(id: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, id)
+      await runTransaction(db, async (transaction) => {
+        const resourceDoc = await transaction.get(docRef)
+        if (!resourceDoc.exists()) {
+          throw new Error('Resource not found')
+        }
+        const currentViews = resourceDoc.data().views || 0
+        transaction.update(docRef, {
+          views: currentViews + 1,
+          updatedAt: serverTimestamp()
+        })
+      })
+    } catch (error) {
+      console.error('Error incrementing resource views:', error)
+      throw error
+    }
+  }
+
+  async toggleLike(id: string, userId: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, id)
+      await runTransaction(db, async (transaction) => {
+        const resourceDoc = await transaction.get(docRef)
+        if (!resourceDoc.exists()) {
+          throw new Error('Resource not found')
+        }
+        const data = resourceDoc.data()
+        const currentLikes = data.likes || 0
+        const likedBy = data.likedBy || {}
+        
+        if (likedBy[userId]) {
+          delete likedBy[userId]
+          transaction.update(docRef, {
+            likes: currentLikes - 1,
+            likedBy,
+            updatedAt: serverTimestamp()
+          })
+        } else {
+          likedBy[userId] = serverTimestamp()
+          transaction.update(docRef, {
+            likes: currentLikes + 1,
+            likedBy,
+            updatedAt: serverTimestamp()
+          })
+        }
+      })
+    } catch (error) {
+      console.error('Error toggling resource like:', error)
+      throw error
+    }
+  }
+
+  async share(id: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, id)
+      await runTransaction(db, async (transaction) => {
+        const resourceDoc = await transaction.get(docRef)
+        if (!resourceDoc.exists()) {
+          throw new Error('Resource not found')
+        }
+        const currentShares = resourceDoc.data().shares || 0
+        transaction.update(docRef, {
+          shares: currentShares + 1,
+          updatedAt: serverTimestamp()
+        })
+      })
+    } catch (error) {
+      console.error('Error incrementing resource shares:', error)
+      throw error
+    }
+  }
+
+  subscribeToResources(
+    callback: (resources: CommunityResource[]) => void,
+    filter?: string
+  ): Unsubscribe {
     const constraints: QueryConstraint[] = [
       where('status', '==', 'active'),
       orderBy('createdAt', 'desc')
     ]
+
+    if (filter && filter !== 'all') {
+      constraints.push(where('category', '==', filter))
+    }
+
     return this.subscribeToCollection<CommunityResource>(callback, constraints)
+  }
+
+  async getPopularResources(limit: number = 5): Promise<CommunityResource[]> {
+    try {
+      const q = query(
+        collection(db, this.collectionName),
+        where('status', '==', 'active'),
+        orderBy('views', 'desc'),
+        limit(limit)
+      )
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map(doc => ({
+        ...doc.data(),
+        id: doc.id
+      })) as CommunityResource[]
+    } catch (error) {
+      console.error('Error getting popular resources:', error)
+      throw error
+    }
   }
 }
 

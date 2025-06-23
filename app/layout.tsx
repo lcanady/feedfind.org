@@ -5,6 +5,8 @@ import './globals.css'
 import { AuthProvider } from '../hooks/useAuth'
 import SetupWrapper from '../components/setup/SetupWrapper'
 import ErrorBoundary from '../components/setup/ErrorBoundary'
+import { LocationProvider } from '../hooks/useLocation'
+import LocationPromptWrapper from '../components/layout/LocationPromptWrapper'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -59,9 +61,12 @@ export default function RootLayout({
         </a>
         <ErrorBoundary>
           <AuthProvider>
-            <SetupWrapper>
-              {children}
-            </SetupWrapper>
+            <LocationProvider>
+              <SetupWrapper>
+                {children}
+                <LocationPromptWrapper />
+              </SetupWrapper>
+            </LocationProvider>
           </AuthProvider>
         </ErrorBoundary>
       </body>

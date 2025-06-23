@@ -1,5 +1,5 @@
 import { LatLng, Address, LocationQueryResult } from '@/types/location'
-import type { Coordinates } from '@/types/database'
+import type { Coordinates, Location } from '@/types/database'
 
 /**
  * Convert Coordinates (database type) to LatLng (location type)
@@ -8,6 +8,16 @@ export function coordinatesToLatLng(coords: Coordinates): LatLng {
   return {
     lat: coords.latitude,
     lng: coords.longitude
+  }
+}
+
+/**
+ * Convert LatLng (location type) to Coordinates (database type)
+ */
+export function latLngToCoordinates(latLng: LatLng): Coordinates {
+  return {
+    latitude: latLng.lat,
+    longitude: latLng.lng
   }
 }
 
@@ -177,4 +187,100 @@ export function isValidLatLng(obj: unknown): obj is LatLng {
          !isNaN((obj as LatLng).lng) &&
          isFinite((obj as LatLng).lat) && 
          isFinite((obj as LatLng).lng)
+}
+
+// Get coordinates from ZIP code (mock implementation - replace with actual geocoding service)
+export const geocodeZipCode = async (zipCode: string): Promise<Coordinates | null> => {
+  // This is a temporary mock implementation that returns coordinates for testing
+  // In production, this should use a real geocoding service like Google Maps Geocoding API
+  
+  // Basic validation
+  if (!validateZipCode(zipCode)) {
+    return null
+  }
+
+  // Mock coordinates for testing - this simulates different locations for different ZIP codes
+  // In production, replace with actual geocoding service
+  const mockCoordinates: { [key: string]: Coordinates } = {
+    '12345': { latitude: 37.7749, longitude: -122.4194 }, // San Francisco
+    '23456': { latitude: 34.0522, longitude: -118.2437 }, // Los Angeles
+    '34567': { latitude: 40.7128, longitude: -74.0060 }, // New York
+    '45678': { latitude: 41.8781, longitude: -87.6298 }, // Chicago
+    '56789': { latitude: 29.7604, longitude: -95.3698 }  // Houston
+  }
+
+  // If we have mock coordinates for this ZIP code, return them
+  if (mockCoordinates[zipCode]) {
+    return mockCoordinates[zipCode]
+  }
+
+  // For any other ZIP code, generate deterministic but random-looking coordinates
+  // This ensures the same ZIP code always gets the same coordinates
+  const seed = zipCode.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0)
+  const lat = 25 + (seed % 25) // Generates latitude between 25 and 50
+  const lng = -125 + (seed % 50) // Generates longitude between -125 and -75
+
+  return {
+    latitude: lat,
+    longitude: lng
+  }
+}
+
+/**
+ * Extract ZIP code from an address string
+ * Returns null if no valid ZIP code is found
+ */
+export function extractZipCode(address: string): string | null {
+  if (!address) return null
+
+  // Try to find a 5-digit ZIP code, optionally followed by a 4-digit extension
+  const zipMatch = address.match(/\b\d{5}(?:-\d{4})?\b/)
+  if (!zipMatch) return null
+
+  const zipCode = zipMatch[0]
+  return validateZipCode(zipCode) ? zipCode : null
+}
+
+// Filter locations by distance from ZIP code or address
+export const filterLocationsByDistance = async (
+  locations: Location[],
+  query: string,
+  maxDistance: number = 25 // Default to 25 miles
+): Promise<Location[]> => {
+  if (!query) {
+    return [] // Return no locations if no query provided
+  }
+
+  // Parse the query to determine if it's a ZIP code or address
+  const parsedQuery = parseLocationQuery(query)
+  
+  let zipCode: string | null = null
+  
+  if (parsedQuery.type === 'zipcode') {
+    zipCode = parsedQuery.value as string
+  } else if (parsedQuery.type === 'address') {
+    // Try to extract ZIP code from address
+    zipCode = extractZipCode(parsedQuery.value as string)
+  }
+
+  // If we couldn't get a ZIP code, return no results
+  if (!zipCode) {
+    return []
+  }
+
+  const coords = await geocodeZipCode(zipCode)
+  if (!coords) {
+    return [] // Return no locations if geocoding fails
+  }
+
+  return locations.filter(location => {
+    if (!location.coordinates) return false
+    
+    const distance = calculateDistance(
+      coordinatesToLatLng(coords),
+      coordinatesToLatLng(location.coordinates)
+    )
+    
+    return distance <= maxDistance
+  })
 } 

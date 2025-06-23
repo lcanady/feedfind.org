@@ -1,0 +1,652 @@
+'use client'
+
+import React, { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
+import Link from 'next/link'
+import Header from '@/components/layout/Header'
+import { HeaderAd, SidebarAd } from '@/components/ui/AdSense'
+import { CommunityEventsService } from '@/lib/communityService'
+import { ProviderService } from '@/lib/databaseService'
+import { useAuth } from '@/hooks/useAuth'
+import type { CreateCommunityEventData, Provider } from '@/types/database'
+
+interface FormData {
+  title: string
+  description: string
+  organization: string
+  location: string
+  address: string
+  startDate: string
+  startTime: string
+  endDate: string
+  endTime: string
+  type: 'workshop' | 'distribution' | 'fundraiser' | 'other'
+  capacity: string
+  registrationRequired: boolean
+  registrationUrl: string
+  contactEmail: string
+  contactPhone: string
+  isVirtual: boolean
+}
+
+interface ValidationErrors {
+  [key: string]: string
+}
+
+export default function NewEventPage() {
+  const router = useRouter()
+  const { user } = useAuth()
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [managedOrganizations, setManagedOrganizations] = useState<Provider[]>([])
+  const [formData, setFormData] = useState<FormData>({
+    title: '',
+    description: '',
+    organization: '',
+    location: '',
+    address: '',
+    startDate: '',
+    startTime: '',
+    endDate: '',
+    endTime: '',
+    type: 'distribution',
+    capacity: '',
+    registrationRequired: false,
+    registrationUrl: '',
+    contactEmail: '',
+    contactPhone: '',
+    isVirtual: false
+  })
+  const [validationErrors, setValidationErrors] = useState<ValidationErrors>({})
+
+  // Load managed organizations
+  useEffect(() => {
+    const loadOrganizations = async () => {
+      if (!user) return
+
+      try {
+        const providerService = new ProviderService()
+        const providers = await providerService.getAllByUserId(user.uid)
+        setManagedOrganizations(providers)
+        
+        // If user only manages one organization, pre-select it
+        if (providers.length === 1) {
+          setFormData(prev => ({
+            ...prev,
+            organization: providers[0].id,
+            contactEmail: providers[0].email || prev.contactEmail,
+            contactPhone: providers[0].phone || prev.contactPhone
+          }))
+        }
+      } catch (err) {
+        console.error('Error loading managed organizations:', err)
+        setError('Failed to load your organizations. Please try again.')
+      }
+    }
+
+    loadOrganizations()
+  }, [user])
+
+  // Redirect if not logged in
+  if (!user) {
+    router.push('/login?redirect=/community/events/new')
+    return null
+  }
+
+  const handleInputChange = (field: keyof FormData, value: any) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+    if (validationErrors[field]) {
+      setValidationErrors(prev => {
+        const { [field]: _, ...rest } = prev
+        return rest
+      })
+    }
+  }
+
+  const validateForm = (): boolean => {
+    const errors: ValidationErrors = {}
+
+    if (!formData.title.trim()) {
+      errors.title = 'Event title is required'
+    }
+
+    if (!formData.description.trim()) {
+      errors.description = 'Event description is required'
+    }
+
+    if (!formData.organization) {
+      errors.organization = 'Please select an organization'
+    }
+
+    if (!formData.isVirtual && !formData.location.trim()) {
+      errors.location = 'Location is required for in-person events'
+    }
+
+    if (!formData.startDate) {
+      errors.startDate = 'Start date is required'
+    }
+
+    if (!formData.startTime) {
+      errors.startTime = 'Start time is required'
+    }
+
+    if (!formData.endDate) {
+      errors.endDate = 'End date is required'
+    }
+
+    if (!formData.endTime) {
+      errors.endTime = 'End time is required'
+    }
+
+    if (!formData.contactEmail.trim()) {
+      errors.contactEmail = 'Contact email is required'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.contactEmail)) {
+      errors.contactEmail = 'Please enter a valid email address'
+    }
+
+    if (formData.registrationRequired && !formData.registrationUrl.trim()) {
+      errors.registrationUrl = 'Registration URL is required when registration is required'
+    }
+
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+
+    if (!validateForm()) {
+      return
+    }
+
+    setLoading(true)
+    setError(null)
+
+    try {
+      const eventsService = new CommunityEventsService()
+
+      // Convert dates and times to timestamps, preserving the user's timezone
+      const userTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone
+      const startDateTime = new Date(`${formData.startDate}T${formData.startTime}`)
+      const endDateTime = new Date(`${formData.endDate}T${formData.endTime}`)
+      
+      // Get the selected organization's details
+      const selectedOrg = managedOrganizations.find(org => org.id === formData.organization)
+      if (!selectedOrg || !selectedOrg.organizationName) {
+        throw new Error('Please select a valid organization')
+      }
+
+      const now = new Date()
+      let eventStatus: 'upcoming' | 'ongoing' | 'completed'
+      
+      // Compare dates in the user's timezone
+      const startInUserTz = new Date(startDateTime.toLocaleString('en-US', { timeZone: userTimezone }))
+      const endInUserTz = new Date(endDateTime.toLocaleString('en-US', { timeZone: userTimezone }))
+      const nowInUserTz = new Date(now.toLocaleString('en-US', { timeZone: userTimezone }))
+      
+      if (startInUserTz > nowInUserTz) {
+        eventStatus = 'upcoming'
+      } else if (endInUserTz > nowInUserTz) {
+        eventStatus = 'ongoing'
+      } else {
+        eventStatus = 'completed'
+      }
+
+      const eventData: CreateCommunityEventData = {
+        title: formData.title,
+        description: formData.description,
+        organization: selectedOrg.organizationName,
+        organizationId: selectedOrg.id,
+        location: formData.location,
+        address: formData.address || '',
+        startDate: startDateTime,
+        endDate: endDateTime,
+        timezone: userTimezone,
+        type: formData.type,
+        registrationRequired: formData.registrationRequired,
+        registrationUrl: formData.registrationUrl || '',
+        contactEmail: formData.contactEmail,
+        contactPhone: formData.contactPhone || '',
+        isVirtual: formData.isVirtual,
+        createdBy: user.uid,
+        eventStatus,
+        status: 'active'
+      }
+
+      // Only add capacity if it's provided
+      if (formData.capacity) {
+        eventData.capacity = parseInt(formData.capacity)
+      }
+
+      await eventsService.create(eventData)
+      router.push('/community/events')
+    } catch (err) {
+      console.error('Error creating event:', err)
+      setError('Failed to create event. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <main className="min-h-screen bg-white">
+      <Header />
+
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <nav className="text-sm text-gray-500 mb-2">
+          <Link href="/community" className="hover:text-blue-600">Community</Link>
+          <span className="mx-2">/</span>
+          <Link href="/community/events" className="hover:text-blue-600">Events</Link>
+          <span className="mx-2">/</span>
+          <span>New Event</span>
+        </nav>
+
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Main Content */}
+          <div className="lg:col-span-3">
+            <HeaderAd />
+
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6">
+              <h1 className="text-2xl font-bold text-gray-900 mb-6">Create New Event</h1>
+
+              {error && (
+                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <p className="text-red-600">{error}</p>
+                </div>
+              )}
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Basic Information */}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Basic Information</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="title" className="block text-sm font-medium text-gray-700">
+                        Event Title *
+                      </label>
+                      <input
+                        type="text"
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => handleInputChange('title', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.title && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.title}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-700">
+                        Description *
+                      </label>
+                      <textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        rows={4}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.description && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.description}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="organization" className="block text-sm font-medium text-gray-700">
+                        Organization *
+                      </label>
+                      {managedOrganizations.length > 0 ? (
+                        <select
+                          id="organization"
+                          value={formData.organization}
+                          onChange={(e) => {
+                            const selectedOrg = managedOrganizations.find(org => org.id === e.target.value)
+                            handleInputChange('organization', e.target.value)
+                            if (selectedOrg) {
+                              handleInputChange('contactEmail', selectedOrg.email || '')
+                              handleInputChange('contactPhone', selectedOrg.phone || '')
+                            }
+                          }}
+                          className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                          required
+                        >
+                          <option value="">Select an organization</option>
+                          {managedOrganizations.map((org) => (
+                            <option key={org.id} value={org.id}>
+                              {org.organizationName}
+                            </option>
+                          ))}
+                        </select>
+                      ) : (
+                        <div className="mt-1">
+                          <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+                            <div className="flex">
+                              <div className="flex-shrink-0">
+                                <svg className="h-5 w-5 text-yellow-400" viewBox="0 0 20 20" fill="currentColor">
+                                  <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                                </svg>
+                              </div>
+                              <div className="ml-3">
+                                <h3 className="text-sm font-medium text-yellow-800">
+                                  No Organizations Found
+                                </h3>
+                                <div className="mt-2 text-sm text-yellow-700">
+                                  <p>
+                                    You need to be registered as a provider to create events.{' '}
+                                    <Link href="/add-organization" className="font-medium underline hover:text-yellow-600">
+                                      Register your organization
+                                    </Link>
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                      {validationErrors.organization && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.organization}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+                        Event Type *
+                      </label>
+                      <select
+                        id="type"
+                        value={formData.type}
+                        onChange={(e) => handleInputChange('type', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      >
+                        <option value="distribution">Food Distribution</option>
+                        <option value="workshop">Workshop</option>
+                        <option value="fundraiser">Fundraiser</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Date and Time */}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Date and Time</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="startDate" className="block text-sm font-medium text-gray-700">
+                        Start Date *
+                      </label>
+                      <input
+                        type="date"
+                        id="startDate"
+                        value={formData.startDate}
+                        onChange={(e) => handleInputChange('startDate', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.startDate && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.startDate}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="startTime" className="block text-sm font-medium text-gray-700">
+                        Start Time *
+                      </label>
+                      <input
+                        type="time"
+                        id="startTime"
+                        value={formData.startTime}
+                        onChange={(e) => handleInputChange('startTime', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.startTime && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.startTime}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="endDate" className="block text-sm font-medium text-gray-700">
+                        End Date *
+                      </label>
+                      <input
+                        type="date"
+                        id="endDate"
+                        value={formData.endDate}
+                        onChange={(e) => handleInputChange('endDate', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.endDate && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.endDate}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="endTime" className="block text-sm font-medium text-gray-700">
+                        End Time *
+                      </label>
+                      <input
+                        type="time"
+                        id="endTime"
+                        value={formData.endTime}
+                        onChange={(e) => handleInputChange('endTime', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.endTime && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.endTime}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location */}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Location</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="isVirtual"
+                          checked={formData.isVirtual}
+                          onChange={(e) => handleInputChange('isVirtual', e.target.checked)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor="isVirtual" className="ml-2 block text-sm text-gray-700">
+                          This is a virtual event
+                        </label>
+                      </div>
+                    </div>
+
+                    {!formData.isVirtual && (
+                      <>
+                        <div>
+                          <label htmlFor="location" className="block text-sm font-medium text-gray-700">
+                            Location Name *
+                          </label>
+                          <input
+                            type="text"
+                            id="location"
+                            value={formData.location}
+                            onChange={(e) => handleInputChange('location', e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            required={!formData.isVirtual}
+                          />
+                          {validationErrors.location && (
+                            <p className="mt-1 text-sm text-red-600">{validationErrors.location}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor="address" className="block text-sm font-medium text-gray-700">
+                            Address *
+                          </label>
+                          <input
+                            type="text"
+                            id="address"
+                            value={formData.address}
+                            onChange={(e) => handleInputChange('address', e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            required={!formData.isVirtual}
+                          />
+                          {validationErrors.address && (
+                            <p className="mt-1 text-sm text-red-600">{validationErrors.address}</p>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Registration */}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Registration</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex items-center mb-4">
+                        <input
+                          type="checkbox"
+                          id="registrationRequired"
+                          checked={formData.registrationRequired}
+                          onChange={(e) => handleInputChange('registrationRequired', e.target.checked)}
+                          className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        />
+                        <label htmlFor="registrationRequired" className="ml-2 block text-sm text-gray-700">
+                          Registration required
+                        </label>
+                      </div>
+                    </div>
+
+                    {formData.registrationRequired && (
+                      <>
+                        <div>
+                          <label htmlFor="registrationUrl" className="block text-sm font-medium text-gray-700">
+                            Registration URL *
+                          </label>
+                          <input
+                            type="url"
+                            id="registrationUrl"
+                            value={formData.registrationUrl}
+                            onChange={(e) => handleInputChange('registrationUrl', e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            required={formData.registrationRequired}
+                            placeholder="https://"
+                          />
+                          {validationErrors.registrationUrl && (
+                            <p className="mt-1 text-sm text-red-600">{validationErrors.registrationUrl}</p>
+                          )}
+                        </div>
+
+                        <div>
+                          <label htmlFor="capacity" className="block text-sm font-medium text-gray-700">
+                            Capacity
+                          </label>
+                          <input
+                            type="number"
+                            id="capacity"
+                            value={formData.capacity}
+                            onChange={(e) => handleInputChange('capacity', e.target.value)}
+                            className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                            min="1"
+                            placeholder="Optional"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                {/* Contact Information */}
+                <div>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Contact Information</h2>
+                  <div className="space-y-4">
+                    <div>
+                      <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700">
+                        Contact Email *
+                      </label>
+                      <input
+                        type="email"
+                        id="contactEmail"
+                        value={formData.contactEmail}
+                        onChange={(e) => handleInputChange('contactEmail', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        required
+                      />
+                      {validationErrors.contactEmail && (
+                        <p className="mt-1 text-sm text-red-600">{validationErrors.contactEmail}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700">
+                        Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        id="contactPhone"
+                        value={formData.contactPhone}
+                        onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                        className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                        placeholder="Optional"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="pt-5">
+                  <div className="flex justify-end">
+                    <Link
+                      href="/community/events"
+                      className="bg-white py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      Cancel
+                    </Link>
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className={`ml-3 inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                        loading ? 'opacity-50 cursor-not-allowed' : ''
+                      }`}
+                    >
+                      {loading ? 'Creating...' : 'Create Event'}
+                    </button>
+                  </div>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <SidebarAd />
+            
+            <div className="bg-white border border-gray-200 rounded-lg p-6 mt-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Tips</h2>
+              <ul className="space-y-4 text-sm text-gray-600">
+                <li>
+                  <strong>Virtual Events:</strong> Check the "virtual event" box to skip location details.
+                </li>
+                <li>
+                  <strong>Registration:</strong> Enable registration to collect RSVPs and set capacity limits.
+                </li>
+                <li>
+                  <strong>Contact Info:</strong> This will be visible to event attendees.
+                </li>
+                <li>
+                  <strong>Dates:</strong> Events must end after they start.
+                </li>
+              </ul>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  )
+}

@@ -20,6 +20,7 @@ const demoLocations: LocationSearchResult[] = [
       providerId: 'demo-provider-1',
       status: 'active' as const,
       createdAt: new Date(),
+      updatedAt: new Date(),
       operatingHours: {
         monday: { open: '09:00', close: '17:00' },
         tuesday: { open: '09:00', close: '17:00' },
@@ -48,6 +49,7 @@ const demoLocations: LocationSearchResult[] = [
       providerId: 'demo-provider-2',
       status: 'active' as const,
       createdAt: new Date(),
+      updatedAt: new Date(),
       operatingHours: {
         monday: { open: '11:00', close: '15:00' },
         tuesday: { open: '11:00', close: '15:00' },
@@ -76,6 +78,7 @@ const demoLocations: LocationSearchResult[] = [
       providerId: 'demo-provider-3',
       status: 'active' as const,
       createdAt: new Date(),
+      updatedAt: new Date(),
       operatingHours: {
         monday: { open: '', close: '', closed: true },
         tuesday: { open: '14:00', close: '18:00' },
@@ -255,6 +258,18 @@ export default function MapPage() {
                     </svg>
                     <div className="text-red-700 text-sm">
                       <span>{error}</span>
+                      {error.includes('API key is not configured') && (
+                        <div className="mt-2">
+                          <p>To configure the Google Maps API key:</p>
+                          <ol className="list-decimal list-inside mt-1 space-y-1">
+                            <li>Create a <a href="https://console.cloud.google.com/" target="_blank" rel="noopener noreferrer" className="text-red-800 underline">Google Cloud project</a></li>
+                            <li>Enable the Maps JavaScript API</li>
+                            <li>Create an API key</li>
+                            <li>Add it to your .env.local file as NEXT_PUBLIC_GOOGLE_MAPS_API_KEY</li>
+                          </ol>
+                          <p className="mt-2">See MAPS_SETUP.md for detailed instructions.</p>
+                        </div>
+                      )}
                       {(error.includes('Database connection failed') || error.includes('No locations found in database')) && (
                         <div className="mt-2">
                           <p>The database appears to be empty. To add test data:</p>

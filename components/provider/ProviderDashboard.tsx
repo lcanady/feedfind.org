@@ -2,10 +2,12 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { ProviderService, LocationService, StatusUpdateService } from '../../lib/databaseService'
+import { CommunityEventsService } from '../../lib/communityService'
 import { useAuth } from '../../hooks/useAuth'
-import type { Provider, Location, StatusUpdate, CurrentLocationStatus } from '../../types/database'
+import type { Provider, Location, StatusUpdate, CurrentLocationStatus, CommunityEvent } from '../../types/database'
 import { ProviderRegistrationForm } from './ProviderRegistrationForm'
 import { VolunteerManagement } from './VolunteerManagement'
+import Link from 'next/link'
 
 export interface ProviderDashboardProps {
   providerId: string
@@ -14,24 +16,26 @@ export interface ProviderDashboardProps {
   className?: string
 }
 
+interface AnalyticsData {
+  totalVisits: number;
+  averageWaitTime: number;
+  statusUpdateCount: number;
+  userSatisfaction: number;
+  thisWeek: {
+    visits: number;
+    updates: number;
+  };
+  lastWeek: {
+    visits: number;
+    updates: number;
+  };
+}
+
 interface DashboardData {
-  provider: Provider | null
-  locations: Location[]
-  recentUpdates: StatusUpdate[]
-  analytics: {
-    totalVisits: number
-    averageWaitTime: number
-    statusUpdateCount: number
-    userSatisfaction: number
-    thisWeek: {
-      visits: number
-      updates: number
-    }
-    lastWeek: {
-      visits: number
-      updates: number
-    }
-  } | null
+  provider: Provider;
+  locations: Location[];
+  recentUpdates: StatusUpdate[];
+  analytics: AnalyticsData | null;
 }
 
 interface LocationFormData {
@@ -42,6 +46,22 @@ interface LocationFormData {
   currentCapacity: number
 }
 
+interface LoadingStates {
+  provider: boolean;
+  locations: boolean;
+  updates: boolean;
+  analytics: boolean;
+  events?: boolean;
+}
+
+interface LoadingErrors {
+  provider?: string;
+  locations?: string;
+  updates?: string;
+  analytics?: string;
+  events?: string;
+}
+
 export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   providerId,
   onLocationUpdate,
@@ -49,13 +69,13 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   className = ''
 }) => {
   const { user, isProvider, isAdminOrSuperuser } = useAuth()
-  const [data, setData] = useState<DashboardData>({
-    provider: null,
-    locations: [],
-    recentUpdates: [],
-    analytics: null
+  const [loadingStates, setLoadingStates] = useState<LoadingStates>({
+    provider: true,
+    locations: true,
+    updates: true,
+    analytics: true
   })
-  const [loading, setLoading] = useState(true)
+  const [loadingErrors, setLoadingErrors] = useState<LoadingErrors>({})
   const [error, setError] = useState<string>('')
   const [showRegistrationForm, setShowRegistrationForm] = useState(false)
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null)
@@ -63,7 +83,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'analytics' | 'volunteers'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'analytics' | 'volunteers' | 'events'>('overview')
   const [statusUpdateForm, setStatusUpdateForm] = useState({
     status: '' as CurrentLocationStatus | '',
     notes: '',
@@ -77,11 +97,16 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     capacity: 0,
     currentCapacity: 0
   })
+  const [events, setEvents] = useState<CommunityEvent[]>([])
+  const [loadingEvents, setLoadingEvents] = useState(false)
+  const [eventError, setEventError] = useState<string>('')
+  const [data, setData] = useState<DashboardData | null>(null)
 
   // Services - memoized to prevent recreation on every render
   const providerService = useMemo(() => new ProviderService(), [])
   const locationService = useMemo(() => new LocationService(), [])
   const statusUpdateService = useMemo(() => new StatusUpdateService(), [])
+  const communityEventsService = useMemo(() => new CommunityEventsService(), [])
 
   // Check access permissions
   const hasAccess = useCallback(() => {
@@ -107,27 +132,33 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   // Load dashboard data
   const loadDashboardData = useCallback(async () => {
     try {
-      setLoading(true)
       setError('')
+      setLoadingErrors({})
       setShowRegistrationForm(false)
 
-      // Check access first - inline to avoid dependency issues
+      // Check access first
       if (!user || (!((isProvider && user.uid === providerId) || isAdminOrSuperuser))) {
         throw new Error('Access denied. You do not have permission to view this dashboard.')
       }
 
-      // Try to load provider data
-      const provider = await providerService.getById(providerId)
+      // Load provider data
+      let provider: Provider | null = null
+      try {
+        setLoadingStates(prev => ({ ...prev, provider: true }))
+        provider = await providerService.getById(providerId)
+        setLoadingStates(prev => ({ ...prev, provider: false }))
+      } catch (err) {
+        setLoadingStates(prev => ({ ...prev, provider: false }))
+        setLoadingErrors(prev => ({ ...prev, provider: err instanceof Error ? err.message : 'Failed to load provider data' }))
+        throw err
+      }
       
       if (!provider) {
-        // If user is trying to access their own provider ID but no provider exists, show registration form
         if (isProvider && user?.uid === providerId && !isAdminOrSuperuser) {
           setShowRegistrationForm(true)
-          setLoading(false)
           return
         }
         
-        // For admins or other cases, show error
         if (isAdminOrSuperuser) {
           throw new Error(`Provider with ID "${providerId}" not found in the database. Please verify the provider ID is correct.`)
         } else {
@@ -135,28 +166,95 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         }
       }
 
-      // Load locations
-      const locations = await locationService.getByProviderId(providerId)
-      
-      // Load recent updates
-      const recentUpdates = await statusUpdateService.getRecentByProviderId(providerId)
-      
-      // Load analytics
-      const analytics = await providerService.getAnalytics(providerId)
-
-      setData({
+      // Initialize dashboard data with empty arrays
+      const dashboardData: DashboardData = {
         provider,
-        locations,
-        recentUpdates,
-        analytics
-      })
+        locations: [],
+        recentUpdates: [],
+        analytics: null
+      }
+
+      // Load locations with error handling
+      try {
+        setLoadingStates(prev => ({ ...prev, locations: true }))
+        const locationsResult = await locationService.getByProviderId(providerId)
+        dashboardData.locations = Array.isArray(locationsResult) ? locationsResult : []
+        setLoadingStates(prev => ({ ...prev, locations: false }))
+      } catch (err) {
+        setLoadingStates(prev => ({ ...prev, locations: false }))
+        setLoadingErrors(prev => ({ ...prev, locations: err instanceof Error ? err.message : 'Failed to load locations' }))
+        console.error('Failed to load locations:', err)
+      }
+      
+      // Load recent updates with error handling
+      try {
+        setLoadingStates(prev => ({ ...prev, updates: true }))
+        const updatesResult = await statusUpdateService.getRecentByProviderId(providerId)
+        dashboardData.recentUpdates = Array.isArray(updatesResult) ? updatesResult : []
+        setLoadingStates(prev => ({ ...prev, updates: false }))
+      } catch (err) {
+        setLoadingStates(prev => ({ ...prev, updates: false }))
+        setLoadingErrors(prev => ({ ...prev, updates: err instanceof Error ? err.message : 'Failed to load status updates' }))
+        console.error('Failed to load status updates:', err)
+      }
+      
+      // Load analytics with error handling
+      try {
+        setLoadingStates(prev => ({ ...prev, analytics: true }))
+        const analytics = await providerService.getAnalytics(providerId)
+        dashboardData.analytics = analytics
+        setLoadingStates(prev => ({ ...prev, analytics: false }))
+      } catch (err) {
+        setLoadingStates(prev => ({ ...prev, analytics: false }))
+        setLoadingErrors(prev => ({ ...prev, analytics: err instanceof Error ? err.message : 'Failed to load analytics' }))
+        console.error('Failed to load analytics:', err)
+      }
+
+      // Set the complete dashboard data
+      setData(dashboardData)
     } catch (err) {
       console.error('Failed to load dashboard data:', err)
       setError(err instanceof Error ? err.message : 'Failed to load dashboard')
-    } finally {
-      setLoading(false)
+      setLoadingStates({
+        provider: false,
+        locations: false,
+        updates: false,
+        analytics: false
+      })
     }
   }, [providerId, providerService, locationService, statusUpdateService, isProvider, user?.uid, isAdminOrSuperuser])
+
+  // Load events when events tab is active
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined
+
+    if (activeTab === 'events') {
+      const loadEvents = async () => {
+        setLoadingEvents(true)
+        setEventError('')
+        try {
+          unsubscribe = communityEventsService.subscribeToEvents((updatedEvents) => {
+            // Filter events for this provider
+            const providerEvents = updatedEvents.filter(event => event.organizationId === providerId)
+            setEvents(providerEvents)
+            setLoadingEvents(false)
+          })
+        } catch (err) {
+          console.error('Failed to load events:', err)
+          setEventError(err instanceof Error ? err.message : 'Failed to load events')
+          setLoadingEvents(false)
+        }
+      }
+
+      loadEvents()
+    }
+
+    return () => {
+      if (unsubscribe) {
+        unsubscribe()
+      }
+    }
+  }, [activeTab, providerId, communityEventsService])
 
   // Handle provider creation
   const handleProviderCreated = useCallback((newProvider: Provider) => {
@@ -343,9 +441,9 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   // Download report function
   const handleDownloadReport = () => {
     const reportData = {
-      provider: data.provider,
-      locations: data.locations,
-      analytics: data.analytics,
+      provider: data?.provider,
+      locations: data?.locations,
+      analytics: data?.analytics,
       generatedAt: new Date().toISOString()
     }
     
@@ -361,26 +459,36 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   }
 
   // Status counts
-  const statusCounts = data.locations.reduce((acc, location) => {
+  const statusCounts = data?.locations.reduce((acc, location) => {
     const status = location.currentStatus || 'unknown'
     acc[status] = (acc[status] || 0) + 1
     return acc
-  }, {} as Record<string, number>)
+  }, {} as Record<string, number>) || {}
 
-  if (loading) {
+  const formatDate = (date: Date | { toDate: () => Date }) => {
+    const d = date instanceof Date ? date : date.toDate()
+    return d.toLocaleDateString()
+  }
+
+  const formatTime = (date: Date | { toDate: () => Date }) => {
+    const d = date instanceof Date ? date : date.toDate()
+    return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  }
+
+  // Update loading indicator in render
+  const isLoading = Object.values(loadingStates).some(Boolean)
+  const isInitialLoad = Object.values(loadingStates).every(Boolean)
+
+  if (isInitialLoad) {
     return (
-      <div className={className}>
-        <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-1/4 mb-6"></div>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            {[1, 2, 3].map(i => (
-              <div key={i} className="bg-gray-200 h-24 rounded-lg"></div>
-            ))}
-          </div>
-          <div className="h-64 bg-gray-200 rounded-lg"></div>
-        </div>
-        <div className="sr-only" role="progressbar" aria-label="Loading dashboard">
-          Loading dashboard data...
+      <div className="flex flex-col items-center justify-center p-8">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <p className="mt-4 text-gray-600">Loading dashboard...</p>
+        <div className="mt-2 text-sm text-gray-500">
+          {loadingStates.provider && <p>Loading provider information...</p>}
+          {loadingStates.locations && <p>Loading location data...</p>}
+          {loadingStates.updates && <p>Loading status updates...</p>}
+          {loadingStates.analytics && <p>Loading analytics...</p>}
         </div>
       </div>
     )
@@ -464,7 +572,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     )
   }
 
-  if (!data.provider) {
+  if (!data?.provider) {
     return (
       <div className={className}>
         <div className="text-center text-gray-500">
@@ -580,6 +688,16 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
             } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
           >
             Locations
+          </button>
+          <button
+            onClick={() => setActiveTab('events')}
+            className={`${
+              activeTab === 'events'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Events
           </button>
           <button
             onClick={() => setActiveTab('volunteers')}
@@ -752,6 +870,107 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
               ))}
             </div>
           </div>
+        </div>
+      )}
+
+      {activeTab === 'events' && (
+        <div>
+          {/* Events Header */}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-semibold text-gray-900">Events</h2>
+            <Link
+              href="/community/events/new"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Create New Event
+            </Link>
+          </div>
+
+          {/* Events List */}
+          {loadingEvents ? (
+            <div className="animate-pulse">
+              <div className="h-24 bg-gray-200 rounded-lg mb-4"></div>
+              <div className="h-24 bg-gray-200 rounded-lg mb-4"></div>
+              <div className="h-24 bg-gray-200 rounded-lg"></div>
+            </div>
+          ) : eventError ? (
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <p className="text-red-800">{eventError}</p>
+            </div>
+          ) : events.length === 0 ? (
+            <div className="text-center py-12 bg-gray-50 rounded-lg">
+              <h3 className="text-lg font-medium text-gray-900 mb-2">No events found</h3>
+              <p className="text-gray-600 mb-4">You haven't created any events yet.</p>
+              <Link
+                href="/community/events/new"
+                className="text-blue-600 hover:text-blue-800"
+              >
+                Create your first event →
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {events.map(event => (
+                <div key={event.id} className="bg-white border border-gray-200 rounded-lg p-6">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">{event.title}</h3>
+                      <p className="text-gray-600 mt-1">{event.description}</p>
+                      <div className="mt-4 grid grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="text-sm font-medium text-gray-500">Date & Time</h4>
+                          <p className="mt-1 text-sm text-gray-900">
+                            {formatDate(event.startDate)}<br />
+                            {formatTime(event.startDate)} - {formatTime(event.endDate)}
+                          </p>
+                        </div>
+                        {!event.isVirtual && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500">Location</h4>
+                            <p className="mt-1 text-sm text-gray-900">
+                              {event.location}
+                              {event.address && <br />}
+                              {event.address}
+                            </p>
+                          </div>
+                        )}
+                        {event.isVirtual && (
+                          <div>
+                            <h4 className="text-sm font-medium text-gray-500">Event Type</h4>
+                            <p className="mt-1 text-sm text-gray-900">
+                              Virtual Event
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                      <div className="mt-4 flex items-center space-x-2">
+                        <span className={`px-2 py-1 text-xs rounded-full ${
+                          event.eventStatus === 'upcoming' ? 'bg-blue-100 text-blue-800' :
+                          event.eventStatus === 'ongoing' ? 'bg-green-100 text-green-800' :
+                          event.eventStatus === 'completed' ? 'bg-gray-100 text-gray-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {event.eventStatus}
+                        </span>
+                        <span className={`px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-800`}>
+                          {event.type}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex space-x-2">
+                      <Link
+                        href={`/community/events/${event.id}`}
+                        prefetch={false}
+                        className="text-blue-600 hover:text-blue-800 text-sm"
+                      >
+                        View Details →
+                      </Link>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       )}
 

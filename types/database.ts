@@ -574,6 +574,10 @@ export interface CommunityEvent extends BaseDocument {
   registrationUrl?: string
   cost?: number
   
+  // Registration
+  registered?: number
+  availableSlots?: number
+  
   // Contact
   contactEmail: string
   contactPhone?: string
@@ -583,6 +587,7 @@ export interface CommunityEvent extends BaseDocument {
   verifiedBy?: string
   createdBy: string
   tags?: string[]
+  eventStatus?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
 }
 
 export interface CommunityResource extends BaseDocument {
@@ -610,6 +615,11 @@ export interface CommunityResource extends BaseDocument {
   views: number
   likes: number
   shares: number
+  
+  // Engagement
+  likedBy?: {
+    [userId: string]: Timestamp | Date
+  }
 }
 
 export interface CommunityEngagement extends BaseDocument {

@@ -3,17 +3,21 @@
 import React, { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { useAuth } from '../../hooks/useAuth'
+import { useLocation } from '@/hooks/useLocation'
 import type { ProfileFormData } from '../../types/auth'
+import { validateZipCode } from '@/lib/locationService'
 import { SidebarAd } from '@/components/ui/AdSense'
 
 export default function ProfileForm() {
   const router = useRouter()
   const { user, updateProfile, loading } = useAuth()
+  const { zipCode: currentZipCode, setUserZipCode } = useLocation()
   const [formData, setFormData] = useState<ProfileFormData>({
     firstName: '',
     lastName: '',
     phoneNumber: '',
     organizationName: '',
+    zipCode: '',
     emailNotifications: true,
     pushNotifications: false,
     locationSharing: true,
@@ -49,6 +53,7 @@ export default function ProfileForm() {
         lastName: profileLastName || displayLastName || '',
         phoneNumber: user.profile?.phoneNumber || user.phoneNumber || '',
         organizationName: user.profile?.organizationName || '',
+        zipCode: currentZipCode || '',
         emailNotifications: user.profile?.accountSettings?.emailNotifications ?? true,
         pushNotifications: user.profile?.accountSettings?.pushNotifications ?? false,
         locationSharing: user.profile?.accountSettings?.locationSharing ?? true,
@@ -63,7 +68,8 @@ export default function ProfileForm() {
       const hasPrePopulatedData = newFormData.firstName || 
                                   newFormData.lastName || 
                                   newFormData.phoneNumber || 
-                                  newFormData.organizationName
+                                  newFormData.organizationName ||
+                                  newFormData.zipCode
       
       if (hasPrePopulatedData) {
         setIsPrePopulated(true)
@@ -95,6 +101,10 @@ export default function ProfileForm() {
       newErrors.phoneNumber = 'Invalid phone number format'
     }
 
+    if (formData.zipCode && !validateZipCode(formData.zipCode)) {
+      newErrors.zipCode = 'Please enter a valid ZIP code'
+    }
+
     setErrors(newErrors)
     return Object.keys(newErrors).length === 0
   }
@@ -108,6 +118,11 @@ export default function ProfileForm() {
     setMessage(null)
 
     try {
+      // Update ZIP code in location context if provided
+      if (formData.zipCode) {
+        setUserZipCode(formData.zipCode)
+      }
+
       await updateProfile(formData)
       
       // Redirect to home page with success message
@@ -202,6 +217,36 @@ export default function ProfileForm() {
                       {errors.lastName}
                     </p>
                   )}
+                </div>
+
+                <div>
+                  <label htmlFor="zipCode" className="block text-sm font-medium text-gray-700 mb-1">
+                    ZIP Code
+                    {formData.zipCode && isPrePopulated && (
+                      <span className="ml-2 text-xs text-green-600 font-normal">✓ Pre-filled</span>
+                    )}
+                  </label>
+                  <input
+                    type="text"
+                    id="zipCode"
+                    value={formData.zipCode}
+                    onChange={(e) => handleInputChange('zipCode', e.target.value)}
+                    className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                      errors.zipCode ? 'border-red-300' : 
+                      formData.zipCode && isPrePopulated ? 'border-green-300 bg-green-50' : 
+                      'border-gray-300'
+                    }`}
+                    placeholder="Enter your ZIP code"
+                    aria-describedby={errors.zipCode ? 'zipCode-error' : undefined}
+                  />
+                  {errors.zipCode && (
+                    <p id="zipCode-error" className="mt-1 text-sm text-red-600" role="alert">
+                      {errors.zipCode}
+                    </p>
+                  )}
+                  <p className="mt-1 text-sm text-gray-500">
+                    Used to show food assistance locations near you
+                  </p>
                 </div>
               </div>
 

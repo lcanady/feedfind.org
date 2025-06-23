@@ -190,7 +190,11 @@ export const LocationMap: React.FC<LocationMapProps> = ({
     }
 
     if (mapsLoadError) {
-      setMapError(mapsLoadError)
+      if (!process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY) {
+        setMapError('Google Maps API key is not configured. Please follow the setup instructions in MAPS_SETUP.md.')
+      } else {
+        setMapError('Failed to load Google Maps. Please check your internet connection.')
+      }
       return
     }
 

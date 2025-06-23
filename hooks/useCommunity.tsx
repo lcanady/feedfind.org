@@ -126,10 +126,11 @@ export function useCommunityEvents() {
 }
 
 // Community Resources Hook
-export function useCommunityResources() {
+export function useCommunityResources(filter?: string) {
   const [resources, setResources] = useState<CommunityResource[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
 
   useEffect(() => {
     setLoading(true)
@@ -138,12 +139,52 @@ export function useCommunityResources() {
     const unsubscribe = communityResourcesService.subscribeToResources((updatedResources) => {
       setResources(updatedResources)
       setLoading(false)
-    })
+    }, filter)
 
     return () => unsubscribe()
+  }, [filter])
+
+  const likeResource = useCallback(async (resourceId: string) => {
+    if (!user) throw new Error('Must be logged in to like resources')
+    try {
+      await communityResourcesService.toggleLike(resourceId, user.uid)
+    } catch (error) {
+      console.error('Error liking resource:', error)
+      throw error
+    }
+  }, [user])
+
+  const shareResource = useCallback(async (resourceId: string) => {
+    try {
+      await communityResourcesService.share(resourceId)
+    } catch (error) {
+      console.error('Error sharing resource:', error)
+      throw error
+    }
   }, [])
 
-  return { resources, loading, error }
+  const viewResource = useCallback(async (resourceId: string) => {
+    try {
+      await communityResourcesService.incrementViews(resourceId)
+    } catch (error) {
+      console.error('Error incrementing resource views:', error)
+    }
+  }, [])
+
+  const isLiked = useCallback((resource: CommunityResource) => {
+    if (!user || !resource.likedBy) return false
+    return !!resource.likedBy[user.uid]
+  }, [user])
+
+  return {
+    resources,
+    loading,
+    error,
+    likeResource,
+    shareResource,
+    viewResource,
+    isLiked
+  }
 }
 
 // Forum Posts Hook

@@ -50,9 +50,10 @@ import type {
   Coordinates,
   CurrentLocationStatus,
   UpdateStatus,
-  LocationSearchResult
+  LocationSearchResult,
+  VolunteerOpportunity
 } from '../types/database'
-import { validateZipCode, calculateDistance, coordinatesToLatLng } from './locationService'
+import { validateZipCode, calculateDistance, coordinatesToLatLng, geocodeZipCode, filterLocationsByDistance } from './locationService'
 
 // Base Database Service Class
 export class DatabaseService {
@@ -611,23 +612,30 @@ export class LocationService extends DatabaseService {
     }
   }
 
-  async getRecentListings(limit: number = 10): Promise<Location[]> {
+  async getRecentListings(limit: number = 10, userQuery?: string): Promise<Location[]> {
     try {
       const results = await this.list('locations', {
         where: [
           { field: 'status', operator: '==', value: 'active' }
         ],
         orderBy: [{ field: 'updatedAt', direction: 'desc' }],
-        limit
+        limit: limit * 2 // Fetch more to account for filtering
       })
 
-      return results.docs.map(doc => ({
+      let locations = results.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       } as Location))
+
+      // If we have a user query, filter and sort by distance
+      if (userQuery) {
+        locations = await filterLocationsByDistance(locations, userQuery)
+      }
+
+      return locations.slice(0, limit)
     } catch (error) {
       console.error('Error fetching recent listings:', error)
-      throw this.handleError(error)
+      throw new Error('Failed to fetch recent listings')
     }
   }
 

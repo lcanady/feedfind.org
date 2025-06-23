@@ -12,6 +12,7 @@ export interface UserProfile {
   lastName?: string
   phoneNumber?: string
   organizationName?: string
+  zipCode?: string
   isVerified: boolean
   createdAt: Date
   updatedAt: Date
@@ -43,6 +44,7 @@ export interface ProfileFormData {
   lastName: string
   phoneNumber?: string
   organizationName?: string
+  zipCode?: string
   emailNotifications: boolean
   pushNotifications: boolean
   locationSharing: boolean

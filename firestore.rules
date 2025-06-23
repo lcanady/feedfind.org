@@ -292,15 +292,18 @@ service cloud.firestore {
                       (isOwner(resource.data.createdBy) || isAdmin());
       
       function isValidCommunityEventData(data) {
-        return data.keys().hasAll(['title', 'description', 'organization', 'date', 'location', 'address', 'contactEmail', 'createdBy']) &&
+        return data.keys().hasAll(['title', 'description', 'organization', 'startDate', 'endDate', 'location', 'address', 'contactEmail', 'createdBy', 'status']) &&
                data.title is string && data.title.size() > 0 && data.title.size() <= 100 &&
                data.description is string && data.description.size() > 0 && data.description.size() <= 2000 &&
                data.organization is string && data.organization.size() > 0 &&
-               data.date is timestamp &&
+               data.startDate is timestamp &&
+               data.endDate is timestamp &&
                data.location is string && data.location.size() > 0 &&
                data.address is string && data.address.size() > 0 &&
                isValidEmail(data.contactEmail) &&
-               data.createdBy is string;
+               data.createdBy is string &&
+               data.status in ['active', 'inactive', 'deleted'] &&
+               (!('eventStatus' in data) || data.eventStatus in ['upcoming', 'ongoing', 'completed', 'cancelled']);
       }
     }
 

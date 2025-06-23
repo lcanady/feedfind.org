@@ -4,7 +4,8 @@ import React, { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { LocationService } from '../../lib/databaseService'
 import { seedIfEmpty } from '../../lib/seedData'
-import type { Location } from '../../types/database'
+import type { Location, OperatingHours } from '../../types/database'
+import { useLocation } from '@/hooks/useLocation'
 
 interface RecentListingsProps {
   limit?: number
@@ -16,6 +17,36 @@ interface LocationWithDistance extends Location {
   timeAgo?: string
 }
 
+const formatOperatingHours = (hours: OperatingHours): string => {
+  const dayIndex = new Date().getDay()
+  const days = {
+    0: 'sunday',
+    1: 'monday',
+    2: 'tuesday',
+    3: 'wednesday',
+    4: 'thursday',
+    5: 'friday',
+    6: 'saturday'
+  } as const
+  
+  const today = days[dayIndex as keyof typeof days]
+  const todayHours = hours[today]
+
+  if (!todayHours) {
+    return 'Hours not available'
+  }
+
+  if (todayHours.closed) {
+    return 'Closed today'
+  }
+  
+  if (todayHours.open && todayHours.close) {
+    return `Open today ${todayHours.open} - ${todayHours.close}`
+  }
+  
+  return 'Hours not available'
+}
+
 const RecentListings: React.FC<RecentListingsProps> = ({ 
   limit = 5, 
   className = '' 
@@ -23,6 +54,7 @@ const RecentListings: React.FC<RecentListingsProps> = ({
   const [listings, setListings] = useState<LocationWithDistance[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>('')
+  const { zipCode } = useLocation()
 
   useEffect(() => {
     const fetchRecentListings = async () => {
@@ -33,25 +65,20 @@ const RecentListings: React.FC<RecentListingsProps> = ({
         // First, ensure we have some data
         await seedIfEmpty()
         
-        // Fetch recent locations ordered by last update
-        const results = await locationService.list('locations', {
-          orderBy: [{ field: 'updatedAt', direction: 'desc' }],
-          limit,
-          where: [{ field: 'status', operator: '==', value: 'active' }]
-        })
+        // Fetch recent locations ordered by last update, filtered by user's location if available
+        const results = await locationService.getRecentListings(limit, zipCode || '')
 
-        const locations: LocationWithDistance[] = results.docs.map(doc => {
-          const data = doc.data() as Location
+        const locations: LocationWithDistance[] = results.map(doc => {
           const location: LocationWithDistance = {
-            ...data,
-            id: doc.id
+            ...doc,
+            distance: (doc as any).distance // Distance will be calculated if zipCode was provided
           }
 
           // Calculate time ago
-          if (data.updatedAt) {
-            const updateTime = data.updatedAt instanceof Date 
-              ? data.updatedAt 
-              : data.updatedAt.toDate()
+          if (doc.updatedAt) {
+            const updateTime = doc.updatedAt instanceof Date 
+              ? doc.updatedAt 
+              : doc.updatedAt.toDate()
             const now = new Date()
             const diffInHours = Math.floor((now.getTime() - updateTime.getTime()) / (1000 * 60 * 60))
             
@@ -80,7 +107,7 @@ const RecentListings: React.FC<RecentListingsProps> = ({
     }
 
     fetchRecentListings()
-  }, [limit])
+  }, [limit, zipCode])
 
   const getStatusDisplay = (status?: string) => {
     switch (status) {
@@ -163,7 +190,7 @@ const RecentListings: React.FC<RecentListingsProps> = ({
   if (listings.length === 0) {
     return (
       <div className={`${className} text-center text-gray-500 py-8`}>
-        <p>No recent listings available.</p>
+        <p>No recent listings available{zipCode ? ' in your area' : ''}.</p>
         <Link 
           href="/search" 
           className="text-blue-600 hover:underline mt-2 inline-block"
@@ -205,6 +232,11 @@ const RecentListings: React.FC<RecentListingsProps> = ({
                   <div className="flex items-center mt-2 text-xs text-gray-500 space-x-4 flex-wrap">
                     <span className="flex items-center">
                       📍 {location.address}
+                      {location.distance !== undefined && (
+                        <span className="ml-1">
+                          ({location.distance.toFixed(1)} miles)
+                        </span>
+                      )}
                     </span>
                     <span 
                       className={statusDisplay.className}
@@ -214,7 +246,7 @@ const RecentListings: React.FC<RecentListingsProps> = ({
                     </span>
                     {location.operatingHours && (
                       <span className="flex items-center">
-                        ⏰ {getCurrentHours(location.operatingHours)}
+                        ⏰ {formatOperatingHours(location.operatingHours)}
                       </span>
                     )}
                     {location.eligibilityRequirements?.length === 0 && (

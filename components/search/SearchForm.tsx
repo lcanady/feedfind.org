@@ -49,7 +49,7 @@ export const SearchForm: React.FC<SearchFormProps> = ({
   }, [results, onResults])
 
   useEffect(() => {
-    if (onError) onError(error || '')
+    if (onError && error) onError(error)
   }, [error, onError])
 
   useEffect(() => {

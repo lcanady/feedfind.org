@@ -7,6 +7,7 @@ import { useAuth } from '@/hooks/useAuth'
 import { volunteerService } from '@/lib/communityService'
 import { ProviderService } from '@/lib/databaseService'
 import Header from '@/components/layout/Header'
+import { HeaderAd, SidebarAd, FooterAd } from '@/components/ui/AdSense'
 import type { CreateVolunteerOpportunityData, Provider } from '@/types/database'
 
 interface FormData {
@@ -94,7 +95,7 @@ export default function PostVolunteerOpportunityPage() {
             ...prev,
             organization: provider.id,
             contactEmail: provider.email,
-            contactPhone: provider.phone || ''
+            contactPhone: provider.phone ? provider.phone : prev.contactPhone
           }))
         }
       } catch (error) {
@@ -216,7 +217,9 @@ export default function PostVolunteerOpportunityPage() {
         contactEmail: formData.contactEmail,
         urgency: formData.urgency,
         category: formData.category,
-        createdBy: user.uid
+        createdBy: user.uid,
+        spotsTotal: formData.spotsTotal ? parseInt(formData.spotsTotal) : undefined,
+        spotsAvailable: formData.spotsTotal ? parseInt(formData.spotsTotal) : undefined
       }
 
       // Add optional fields if they have values
@@ -232,9 +235,6 @@ export default function PostVolunteerOpportunityPage() {
       }
       if (formData.endDate) {
         opportunityData.endDate = new Date(formData.endDate)
-      }
-      if (formData.spotsTotal) {
-        opportunityData.spotsTotal = parseInt(formData.spotsTotal)
       }
       if (formData.estimatedHours) {
         opportunityData.estimatedHours = parseInt(formData.estimatedHours)
@@ -275,60 +275,46 @@ export default function PostVolunteerOpportunityPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <main id="main-content" className="min-h-screen bg-gray-50">
       <Header />
-      <main className="max-w-4xl mx-auto px-4 py-12">
-        <div className="bg-white rounded-lg shadow-sm p-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-6">
-            Post a Volunteer Opportunity
-          </h1>
+      
+      {/* Top Banner Ad */}
+      <HeaderAd />
 
-          {loadingProviders ? (
-            <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-              <p className="mt-2 text-gray-600">Loading your organizations...</p>
-            </div>
-          ) : providers.length === 0 ? (
-            <div className="text-center py-8">
-              <p className="text-gray-600 mb-4">
-                You need to register an organization before posting volunteer opportunities.
-              </p>
-              <Link
-                href="/add-organization"
-                className="inline-block bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-              >
-                Register Organization
-              </Link>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        <div className="grid lg:grid-cols-4 gap-8">
+          {/* Main Form Content */}
+          <div className="lg:col-span-3">
+            <div className="bg-white border border-gray-200 rounded-lg p-6">
+              <h1 className="text-2xl font-bold text-gray-900 mb-6">Post a Volunteer Opportunity</h1>
+              
               {error && (
-                <div className="bg-red-50 text-red-700 p-4 rounded-lg">
+                <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
                   {error}
                 </div>
               )}
 
-              {/* Organization Selection */}
-              <div>
-                <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-2">
-                  Organization *
-                </label>
-                <div className="flex gap-2">
+              <form onSubmit={handleSubmit} className="space-y-6">
+                {/* Organization Selection */}
+                <div>
+                  <label htmlFor="organization" className="block text-sm font-medium text-gray-700 mb-1">
+                    Organization
+                  </label>
                   <select
                     id="organization"
+                    name="organization"
                     value={formData.organization}
                     onChange={(e) => {
                       const provider = providers.find(p => p.id === e.target.value)
                       setFormData(prev => ({
                         ...prev,
                         organization: e.target.value,
-                        contactEmail: provider?.email ?? prev.contactEmail,
-                        contactPhone: provider?.phone ?? prev.contactPhone
+                        contactEmail: provider ? provider.email : prev.contactEmail,
+                        contactPhone: provider && provider.phone ? provider.phone : prev.contactPhone
                       }))
                     }}
-                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    className="mt-1 block w-full border border-gray-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
                     required
-                    disabled={loading}
                   >
                     <option value="">Select an organization</option>
                     {providers.map((provider) => (
@@ -337,453 +323,528 @@ export default function PostVolunteerOpportunityPage() {
                       </option>
                     ))}
                   </select>
-                  {formData.organization && (
-                    <Link
-                      href={`/update-listing?id=${formData.organization}`}
-                      className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                      </svg>
-                      Edit
-                    </Link>
-                  )}
                 </div>
-              </div>
 
-              {/* Basic Information */}
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
-                <div className="grid grid-cols-1 gap-4">
-                  <div>
-                    <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
-                      Title *
-                    </label>
-                    <input
-                      type="text"
-                      id="title"
-                      value={formData.title}
-                      onChange={(e) => handleInputChange('title', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.title ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="e.g., Weekend Food Pantry Assistant"
-                    />
-                    {errors.title && (
-                      <p className="mt-1 text-sm text-red-600">{errors.title}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
-                      Description *
-                    </label>
-                    <textarea
-                      id="description"
-                      value={formData.description}
-                      onChange={(e) => handleInputChange('description', e.target.value)}
-                      rows={4}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.description ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="Describe the volunteer opportunity, responsibilities, and impact..."
-                    />
-                    {errors.description && (
-                      <p className="mt-1 text-sm text-red-600">{errors.description}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Location & Schedule */}
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Location & Schedule</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
-                      Location *
-                    </label>
-                    <input
-                      type="text"
-                      id="location"
-                      value={formData.location}
-                      onChange={(e) => handleInputChange('location', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.location ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="e.g., Downtown Los Angeles"
-                    />
-                    {errors.location && (
-                      <p className="mt-1 text-sm text-red-600">{errors.location}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
-                      Street Address
-                    </label>
-                    <input
-                      type="text"
-                      id="address"
-                      value={formData.address}
-                      onChange={(e) => handleInputChange('address', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., 123 Main St"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="flex items-center space-x-2">
+                {/* Basic Information */}
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">Basic Information</h2>
+                  <div className="grid grid-cols-1 gap-4">
+                    <div>
+                      <label htmlFor="title" className="block text-sm font-medium text-gray-700 mb-1">
+                        Title *
+                      </label>
                       <input
-                        type="checkbox"
-                        checked={formData.isRemote}
-                        onChange={(e) => handleInputChange('isRemote', e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        type="text"
+                        id="title"
+                        value={formData.title}
+                        onChange={(e) => handleInputChange('title', e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.title ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="e.g., Weekend Food Pantry Assistant"
                       />
-                      <span className="text-sm text-gray-700">This is a remote opportunity</span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label htmlFor="timeCommitment" className="block text-sm font-medium text-gray-700 mb-1">
-                      Time Commitment *
-                    </label>
-                    <input
-                      type="text"
-                      id="timeCommitment"
-                      value={formData.timeCommitment}
-                      onChange={(e) => handleInputChange('timeCommitment', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.timeCommitment ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                      placeholder="e.g., 4 hours/week"
-                    />
-                    {errors.timeCommitment && (
-                      <p className="mt-1 text-sm text-red-600">{errors.timeCommitment}</p>
-                    )}
-                  </div>
-
-                  <div>
-                    <label htmlFor="estimatedHours" className="block text-sm font-medium text-gray-700 mb-1">
-                      Estimated Total Hours
-                    </label>
-                    <input
-                      type="number"
-                      id="estimatedHours"
-                      value={formData.estimatedHours}
-                      onChange={(e) => handleInputChange('estimatedHours', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., 20"
-                    />
-                  </div>
-                </div>
-
-                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.isOngoing}
-                        onChange={(e) => handleInputChange('isOngoing', e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">This is an ongoing opportunity</span>
-                    </label>
-                  </div>
-
-                  {!formData.isOngoing && (
-                    <>
-                      <div>
-                        <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
-                          Start Date
-                        </label>
-                        <input
-                          type="date"
-                          id="startDate"
-                          value={formData.startDate}
-                          onChange={(e) => handleInputChange('startDate', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-
-                      <div>
-                        <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
-                          End Date
-                        </label>
-                        <input
-                          type="date"
-                          id="endDate"
-                          value={formData.endDate}
-                          onChange={(e) => handleInputChange('endDate', e.target.value)}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Requirements */}
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Requirements & Skills</h2>
-                
-                {/* Skills */}
-                <div className="mb-4">
-                  <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
-                    Required Skills
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      id="skills"
-                      value={skillInput}
-                      onChange={(e) => setSkillInput(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., Food handling certification"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddSkill}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {formData.skills.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {formData.skills.map((skill, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-sm bg-blue-100 text-blue-800"
-                        >
-                          {skill}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveSkill(index)}
-                            className="ml-1 text-blue-600 hover:text-blue-800"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                      {errors.title && (
+                        <p className="mt-1 text-sm text-red-600">{errors.title}</p>
+                      )}
                     </div>
-                  )}
+
+                    <div>
+                      <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
+                        Description *
+                      </label>
+                      <textarea
+                        id="description"
+                        value={formData.description}
+                        onChange={(e) => handleInputChange('description', e.target.value)}
+                        rows={4}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.description ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="Describe the volunteer opportunity, responsibilities, and impact..."
+                      />
+                      {errors.description && (
+                        <p className="mt-1 text-sm text-red-600">{errors.description}</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Location & Schedule */}
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">Location & Schedule</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+                        Location *
+                      </label>
+                      <input
+                        type="text"
+                        id="location"
+                        value={formData.location}
+                        onChange={(e) => handleInputChange('location', e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.location ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="e.g., Downtown Los Angeles"
+                      />
+                      {errors.location && (
+                        <p className="mt-1 text-sm text-red-600">{errors.location}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="address" className="block text-sm font-medium text-gray-700 mb-1">
+                        Street Address
+                      </label>
+                      <input
+                        type="text"
+                        id="address"
+                        value={formData.address}
+                        onChange={(e) => handleInputChange('address', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 123 Main St"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.isRemote}
+                          onChange={(e) => handleInputChange('isRemote', e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">This is a remote opportunity</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label htmlFor="timeCommitment" className="block text-sm font-medium text-gray-700 mb-1">
+                        Time Commitment *
+                      </label>
+                      <input
+                        type="text"
+                        id="timeCommitment"
+                        value={formData.timeCommitment}
+                        onChange={(e) => handleInputChange('timeCommitment', e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.timeCommitment ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                        placeholder="e.g., 4 hours/week"
+                      />
+                      {errors.timeCommitment && (
+                        <p className="mt-1 text-sm text-red-600">{errors.timeCommitment}</p>
+                      )}
+                    </div>
+
+                    <div>
+                      <label htmlFor="estimatedHours" className="block text-sm font-medium text-gray-700 mb-1">
+                        Estimated Total Hours
+                      </label>
+                      <input
+                        type="number"
+                        id="estimatedHours"
+                        value={formData.estimatedHours}
+                        onChange={(e) => handleInputChange('estimatedHours', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 20"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.isOngoing}
+                          onChange={(e) => handleInputChange('isOngoing', e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">This is an ongoing opportunity</span>
+                      </label>
+                    </div>
+
+                    {!formData.isOngoing && (
+                      <>
+                        <div>
+                          <label htmlFor="startDate" className="block text-sm font-medium text-gray-700 mb-1">
+                            Start Date
+                          </label>
+                          <input
+                            type="date"
+                            id="startDate"
+                            value={formData.startDate}
+                            onChange={(e) => handleInputChange('startDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+
+                        <div>
+                          <label htmlFor="endDate" className="block text-sm font-medium text-gray-700 mb-1">
+                            End Date
+                          </label>
+                          <input
+                            type="date"
+                            id="endDate"
+                            value={formData.endDate}
+                            onChange={(e) => handleInputChange('endDate', e.target.value)}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    )}
+                  </div>
                 </div>
 
                 {/* Requirements */}
-                <div className="mb-4">
-                  <label htmlFor="requirements" className="block text-sm font-medium text-gray-700 mb-1">
-                    Additional Requirements
-                  </label>
-                  <div className="flex space-x-2">
-                    <input
-                      type="text"
-                      id="requirements"
-                      value={requirementInput}
-                      onChange={(e) => setRequirementInput(e.target.value)}
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., Must be 18 or older"
-                    />
-                    <button
-                      type="button"
-                      onClick={handleAddRequirement}
-                      className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
-                    >
-                      Add
-                    </button>
-                  </div>
-                  {formData.requirements.length > 0 && (
-                    <div className="mt-2 flex flex-wrap gap-2">
-                      {formData.requirements.map((requirement, index) => (
-                        <span
-                          key={index}
-                          className="inline-flex items-center px-2 py-1 rounded-md text-sm bg-gray-100 text-gray-800"
-                        >
-                          {requirement}
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveRequirement(index)}
-                            className="ml-1 text-gray-600 hover:text-gray-800"
-                          >
-                            ×
-                          </button>
-                        </span>
-                      ))}
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">Requirements & Skills</h2>
+                  
+                  {/* Skills */}
+                  <div className="mb-4">
+                    <label htmlFor="skills" className="block text-sm font-medium text-gray-700 mb-1">
+                      Required Skills
+                    </label>
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        id="skills"
+                        value={skillInput}
+                        onChange={(e) => setSkillInput(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Food handling certification"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddSkill}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      >
+                        Add
+                      </button>
                     </div>
-                  )}
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="ageRestriction" className="block text-sm font-medium text-gray-700 mb-1">
-                      Age Restriction
-                    </label>
-                    <input
-                      type="text"
-                      id="ageRestriction"
-                      value={formData.ageRestriction}
-                      onChange={(e) => handleInputChange('ageRestriction', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., 18+"
-                    />
-                  </div>
-
-                  <div>
-                    <label htmlFor="spotsTotal" className="block text-sm font-medium text-gray-700 mb-1">
-                      Total Spots Available
-                    </label>
-                    <input
-                      type="number"
-                      id="spotsTotal"
-                      value={formData.spotsTotal}
-                      onChange={(e) => handleInputChange('spotsTotal', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="e.g., 10"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.backgroundCheckRequired}
-                        onChange={(e) => handleInputChange('backgroundCheckRequired', e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Background check required</span>
-                    </label>
-                  </div>
-
-                  <div>
-                    <label className="flex items-center space-x-2">
-                      <input
-                        type="checkbox"
-                        checked={formData.trainingRequired}
-                        onChange={(e) => handleInputChange('trainingRequired', e.target.checked)}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <span className="text-sm text-gray-700">Training required</span>
-                    </label>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contact Information */}
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Contact Information</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Email *
-                    </label>
-                    <input
-                      type="email"
-                      id="contactEmail"
-                      value={formData.contactEmail}
-                      onChange={(e) => handleInputChange('contactEmail', e.target.value)}
-                      className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
-                        errors.contactEmail ? 'border-red-300' : 'border-gray-300'
-                      }`}
-                    />
-                    {errors.contactEmail && (
-                      <p className="mt-1 text-sm text-red-600">{errors.contactEmail}</p>
+                    {formData.skills.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {formData.skills.map((skill, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-sm bg-blue-100 text-blue-800"
+                          >
+                            {skill}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveSkill(index)}
+                              className="ml-1 text-blue-600 hover:text-blue-800"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
                     )}
                   </div>
 
-                  <div>
-                    <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
-                      Contact Phone
+                  {/* Requirements */}
+                  <div className="mb-4">
+                    <label htmlFor="requirements" className="block text-sm font-medium text-gray-700 mb-1">
+                      Additional Requirements
                     </label>
-                    <input
-                      type="tel"
-                      id="contactPhone"
-                      value={formData.contactPhone}
-                      onChange={(e) => handleInputChange('contactPhone', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="(555) 123-4567"
-                    />
+                    <div className="flex space-x-2">
+                      <input
+                        type="text"
+                        id="requirements"
+                        value={requirementInput}
+                        onChange={(e) => setRequirementInput(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., Must be 18 or older"
+                      />
+                      <button
+                        type="button"
+                        onClick={handleAddRequirement}
+                        className="px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500"
+                      >
+                        Add
+                      </button>
+                    </div>
+                    {formData.requirements.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {formData.requirements.map((requirement, index) => (
+                          <span
+                            key={index}
+                            className="inline-flex items-center px-2 py-1 rounded-md text-sm bg-gray-100 text-gray-800"
+                          >
+                            {requirement}
+                            <button
+                              type="button"
+                              onClick={() => handleRemoveRequirement(index)}
+                              className="ml-1 text-gray-600 hover:text-gray-800"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label htmlFor="applicationUrl" className="block text-sm font-medium text-gray-700 mb-1">
-                      Application URL
-                    </label>
-                    <input
-                      type="url"
-                      id="applicationUrl"
-                      value={formData.applicationUrl}
-                      onChange={(e) => handleInputChange('applicationUrl', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      placeholder="https://"
-                    />
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="ageRestriction" className="block text-sm font-medium text-gray-700 mb-1">
+                        Age Restriction
+                      </label>
+                      <input
+                        type="text"
+                        id="ageRestriction"
+                        value={formData.ageRestriction}
+                        onChange={(e) => handleInputChange('ageRestriction', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 18+"
+                      />
+                    </div>
+
+                    <div>
+                      <label htmlFor="spotsTotal" className="block text-sm font-medium text-gray-700 mb-1">
+                        Total Spots Available
+                      </label>
+                      <input
+                        type="number"
+                        id="spotsTotal"
+                        value={formData.spotsTotal}
+                        onChange={(e) => handleInputChange('spotsTotal', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="e.g., 10"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.backgroundCheckRequired}
+                          onChange={(e) => handleInputChange('backgroundCheckRequired', e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Background check required</span>
+                      </label>
+                    </div>
+
+                    <div>
+                      <label className="flex items-center space-x-2">
+                        <input
+                          type="checkbox"
+                          checked={formData.trainingRequired}
+                          onChange={(e) => handleInputChange('trainingRequired', e.target.checked)}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm text-gray-700">Training required</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
-              </div>
 
-              {/* Category & Urgency */}
-              <div>
-                <h2 className="text-lg font-medium text-gray-900 mb-4">Category & Priority</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
-                      Category *
-                    </label>
-                    <select
-                      id="category"
-                      value={formData.category}
-                      onChange={(e) => handleInputChange('category', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="food_distribution">Food Distribution</option>
-                      <option value="kitchen_help">Kitchen Help</option>
-                      <option value="delivery">Delivery</option>
-                      <option value="events">Events</option>
-                      <option value="admin">Administrative</option>
-                      <option value="other">Other</option>
-                    </select>
-                  </div>
+                {/* Contact Information */}
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">Contact Information</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-1">
+                        Contact Email *
+                      </label>
+                      <input
+                        type="email"
+                        id="contactEmail"
+                        value={formData.contactEmail}
+                        onChange={(e) => handleInputChange('contactEmail', e.target.value)}
+                        className={`w-full px-3 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 ${
+                          errors.contactEmail ? 'border-red-300' : 'border-gray-300'
+                        }`}
+                      />
+                      {errors.contactEmail && (
+                        <p className="mt-1 text-sm text-red-600">{errors.contactEmail}</p>
+                      )}
+                    </div>
 
-                  <div>
-                    <label htmlFor="urgency" className="block text-sm font-medium text-gray-700 mb-1">
-                      Priority Level *
-                    </label>
-                    <select
-                      id="urgency"
-                      value={formData.urgency}
-                      onChange={(e) => handleInputChange('urgency', e.target.value)}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                      <option value="low">Low Priority</option>
-                      <option value="normal">Normal</option>
-                      <option value="high">High Priority</option>
-                      <option value="urgent">Urgent Need</option>
-                    </select>
+                    <div>
+                      <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-1">
+                        Contact Phone
+                      </label>
+                      <input
+                        type="tel"
+                        id="contactPhone"
+                        value={formData.contactPhone}
+                        onChange={(e) => handleInputChange('contactPhone', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="(555) 123-4567"
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
+                      <label htmlFor="applicationUrl" className="block text-sm font-medium text-gray-700 mb-1">
+                        Application URL
+                      </label>
+                      <input
+                        type="url"
+                        id="applicationUrl"
+                        value={formData.applicationUrl}
+                        onChange={(e) => handleInputChange('applicationUrl', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        placeholder="https://"
+                      />
+                    </div>
                   </div>
                 </div>
+
+                {/* Category & Urgency */}
+                <div>
+                  <h2 className="text-lg font-medium text-gray-900 mb-4">Category & Priority</h2>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+                        Category *
+                      </label>
+                      <select
+                        id="category"
+                        value={formData.category}
+                        onChange={(e) => handleInputChange('category', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="food_distribution">Food Distribution</option>
+                        <option value="kitchen_help">Kitchen Help</option>
+                        <option value="delivery">Delivery</option>
+                        <option value="events">Events</option>
+                        <option value="admin">Administrative</option>
+                        <option value="other">Other</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label htmlFor="urgency" className="block text-sm font-medium text-gray-700 mb-1">
+                        Priority Level *
+                      </label>
+                      <select
+                        id="urgency"
+                        value={formData.urgency}
+                        onChange={(e) => handleInputChange('urgency', e.target.value)}
+                        className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      >
+                        <option value="low">Low Priority</option>
+                        <option value="normal">Normal</option>
+                        <option value="high">High Priority</option>
+                        <option value="urgent">Urgent Need</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Submit Button */}
+                <div className="flex justify-end space-x-4">
+                  <Link
+                    href="/community/volunteer"
+                    className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Cancel
+                  </Link>
+                  <button
+                    type="submit"
+                    disabled={loading}
+                    className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
+                      loading ? 'opacity-75 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {loading ? 'Creating...' : 'Create Opportunity'}
+                  </button>
+                </div>
+              </form>
+            </div>
+
+            {/* Bottom Banner Ad */}
+            <FooterAd />
+          </div>
+
+          {/* Sidebar */}
+          <div className="lg:col-span-1">
+            <div className="space-y-6">
+              {/* Sidebar Ad */}
+              <SidebarAd />
+              
+              {/* Tips Section */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Tips for Success</h3>
+                <ul className="text-sm text-gray-600 space-y-2">
+                  <li>• Be clear about time commitments</li>
+                  <li>• List any required skills</li>
+                  <li>• Specify location details</li>
+                  <li>• Include contact information</li>
+                </ul>
               </div>
 
-              {/* Submit Button */}
-              <div className="flex justify-end space-x-4">
-                <Link
-                  href="/community/volunteer"
-                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              {/* Help Section */}
+              <div className="bg-white border border-gray-200 rounded-lg p-4">
+                <h3 className="font-semibold text-gray-900 mb-3">Need Help?</h3>
+                <p className="text-sm text-gray-600 mb-4">
+                  Having trouble posting your opportunity? Our support team is here to help.
+                </p>
+                <a 
+                  href="mailto:support@feedfind.org"
+                  className="text-blue-600 hover:text-blue-800 text-sm font-medium"
                 >
-                  Cancel
-                </Link>
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className={`px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                    loading ? 'opacity-75 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {loading ? 'Creating...' : 'Create Opportunity'}
-                </button>
+                  Contact Support →
+                </a>
               </div>
-            </form>
-          )}
+            </div>
+          </div>
         </div>
-      </main>
-    </div>
+      </div>
+
+      {/* Footer */}
+      <div className="border-t border-gray-200 bg-gray-50 mt-12">
+        <div className="max-w-7xl mx-auto px-4 py-6">
+          {/* Footer Ad */}
+          <FooterAd />
+          
+          <div className="grid md:grid-cols-4 gap-6 text-sm mt-6">
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">about</h3>
+              <ul className="space-y-1">
+                <li><a href="#" className="text-blue-600 hover:underline">help & FAQ</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">safety tips</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">terms of use</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">providers</h3>
+              <ul className="space-y-1">
+                <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
+                <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
+                <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
+                <li><Link href="/bulkposting" className="text-blue-600 hover:underline">bulk posting</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">community</h3>
+              <ul className="space-y-1">
+                <li><Link href="/community/volunteer" className="text-blue-600 hover:underline">volunteer opportunities</Link></li>
+                <li><a href="#" className="text-blue-600 hover:underline">donate to local organizations</a></li>
+                <li><Link href="/community/forums" className="text-blue-600 hover:underline">community forums</Link></li>
+                <li><Link href="/community/resources" className="text-blue-600 hover:underline">resource guides</Link></li>
+              </ul>
+            </div>
+            <div>
+              <h3 className="font-semibold text-gray-900 mb-2">contact</h3>
+              <ul className="space-y-1">
+                <li><a href="#" className="text-blue-600 hover:underline">report an issue</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">suggest improvements</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">partnership inquiries</a></li>
+                <li><a href="#" className="text-blue-600 hover:underline">feedback</a></li>
+              </ul>
+            </div>
+          </div>
+          <div className="mt-6 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
+            <p>© 2024 feedfind.org - connecting communities with food assistance resources</p>
+          </div>
+        </div>
+      </div>
+    </main>
   )
 } 

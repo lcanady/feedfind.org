@@ -8,21 +8,22 @@ import { useCommunityResources } from '@/hooks/useCommunity'
 import type { CommunityResource } from '@/types/database'
 import { formatDistanceToNow } from 'date-fns'
 import { Timestamp } from 'firebase/firestore'
+import ResourceSubmissionForm from '@/components/community/ResourceSubmissionForm'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function ResourcesPage() {
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const { resources, loading, error } = useCommunityResources(selectedCategory)
+  const [showSubmissionForm, setShowSubmissionForm] = useState(false)
+  const { resources, loading, error, likeResource, shareResource, viewResource, isLiked } = useCommunityResources(selectedCategory)
+  const { user } = useAuth()
 
   const categories = [
     { id: 'all', name: 'All Resources' },
-    { id: 'government', name: 'Government Benefits' },
-    { id: 'local', name: 'Local Resources' },
-    { id: 'transportation', name: 'Transportation' },
-    { id: 'family', name: 'Family Support' },
-    { id: 'national', name: 'National Resources' },
-    { id: 'housing', name: 'Housing' },
-    { id: 'healthcare', name: 'Healthcare' },
-    { id: 'education', name: 'Education' }
+    { id: 'food_assistance', name: 'Food Assistance' },
+    { id: 'nutrition', name: 'Nutrition' },
+    { id: 'cooking', name: 'Cooking' },
+    { id: 'budgeting', name: 'Budgeting' },
+    { id: 'other', name: 'Other Resources' }
   ]
 
   const getTypeIcon = (type: string) => {
@@ -33,22 +34,22 @@ export default function ResourcesPage() {
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
         )
-      case 'website':
+      case 'article':
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9-9a9 9 0 00-9 9m9-9v18" />
-          </svg>
-        )
-      case 'document':
-        return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2.5 2.5 0 00-2.5-2.5H14" />
           </svg>
         )
       case 'video':
         return (
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1.586a1 1 0 01.707.293l4.414 4.414a1 1 0 01.293.707V17M9 10v4a1 1 0 01-1 1H6a1 1 0 01-1-1v-4a1 1 0 011-1h2M9 10V7a1 1 0 011-1h2a1 1 0 011 1v3" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+        )
+      case 'link':
+        return (
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
           </svg>
         )
       default:
@@ -60,6 +61,37 @@ export default function ResourcesPage() {
     if (!timestamp) return 'Recently'
     const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp
     return formatDistanceToNow(date, { addSuffix: true })
+  }
+
+  const handleResourceClick = async (resource: CommunityResource) => {
+    await viewResource(resource.id)
+  }
+
+  const handleLikeClick = async (e: React.MouseEvent, resource: CommunityResource) => {
+    e.preventDefault()
+    e.stopPropagation()
+    if (!user) {
+      // TODO: Show login prompt
+      return
+    }
+    await likeResource(resource.id)
+  }
+
+  const handleShareClick = async (e: React.MouseEvent, resource: CommunityResource) => {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    try {
+      await navigator.share({
+        title: resource.title,
+        text: resource.description,
+        url: window.location.href
+      })
+      await shareResource(resource.id)
+    } catch (error) {
+      // Handle share error or fallback
+      console.error('Error sharing resource:', error)
+    }
   }
 
   return (
@@ -125,19 +157,27 @@ export default function ResourcesPage() {
                 <p className="text-blue-700 text-sm mb-4">
                   Help others by sharing useful resources and guides with the community.
                 </p>
-                <Link
-                  href="/community/resources"
+                <button
+                  onClick={() => setShowSubmissionForm(true)}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
                 >
                   Submit a Resource
-                </Link>
+                </button>
               </div>
             </div>
           </div>
 
           {/* Resource List */}
           <div className="lg:col-span-3">
-            {loading ? (
+            {showSubmissionForm ? (
+              <div className="mb-8">
+                <h2 className="text-xl font-semibold text-gray-900 mb-4">Submit a New Resource</h2>
+                <ResourceSubmissionForm
+                  onSuccess={() => setShowSubmissionForm(false)}
+                  onCancel={() => setShowSubmissionForm(false)}
+                />
+              </div>
+            ) : loading ? (
               <div className="text-center py-12">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
                 <p className="mt-4 text-gray-600">Loading resources...</p>
@@ -155,12 +195,15 @@ export default function ResourcesPage() {
               <div className="space-y-6">
                 {resources.map((resource, index) => (
                   <React.Fragment key={resource.id}>
-                    <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                    <div 
+                      className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow cursor-pointer"
+                      onClick={() => handleResourceClick(resource)}
+                    >
                       <div className="flex items-start justify-between mb-4">
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <div className="flex items-center text-blue-600">
-                              {getTypeIcon(resource.type)}
+                              {getTypeIcon(resource.contentType)}
                             </div>
                             <h3 className="text-xl font-semibold text-gray-900">{resource.title}</h3>
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
@@ -169,7 +212,7 @@ export default function ResourcesPage() {
                           </div>
                           <p className="text-gray-600 mb-3">{resource.description}</p>
                           <div className="flex items-center text-sm text-gray-500 space-x-4">
-                            <span>by {resource.authorName}</span>
+                            <span>by {resource.author}</span>
                             <span>•</span>
                             <span>{resource.views} views</span>
                             <span>•</span>
@@ -181,7 +224,7 @@ export default function ResourcesPage() {
                       </div>
 
                       {/* Tags */}
-                      {resource.tags && (
+                      {resource.tags && resource.tags.length > 0 && (
                         <div className="mb-4">
                           <div className="flex flex-wrap gap-2">
                             {resource.tags.map((tag, tagIndex) => (
@@ -196,24 +239,43 @@ export default function ResourcesPage() {
                       {/* Actions */}
                       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                         <div className="flex items-center space-x-4">
-                          {resource.url ? (
-                            <a 
-                              href={resource.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            >
-                              Visit Resource
-                              <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                              </svg>
-                            </a>
-                          ) : (
-                            <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                              View Resource
-                            </button>
-                          )}
+                          <button
+                            onClick={(e) => handleLikeClick(e, resource)}
+                            className={`inline-flex items-center space-x-1 text-sm font-medium ${
+                              isLiked(resource) ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'
+                            }`}
+                          >
+                            <svg className="w-5 h-5" fill={isLiked(resource) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+                            </svg>
+                            <span>Like</span>
+                          </button>
+
+                          <button
+                            onClick={(e) => handleShareClick(e, resource)}
+                            className="inline-flex items-center space-x-1 text-sm font-medium text-gray-500 hover:text-blue-600"
+                          >
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+                            </svg>
+                            <span>Share</span>
+                          </button>
                         </div>
+
+                        {resource.externalUrl && (
+                          <a
+                            href={resource.externalUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            onClick={(e) => e.stopPropagation()}
+                          >
+                            Visit Resource
+                            <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                          </a>
+                        )}
                       </div>
                     </div>
 
