@@ -487,7 +487,7 @@ export class LocationService extends DatabaseService {
     return filteredLocations as Location[]
   }
 
-  async searchByText(searchText: string): Promise<Location[]> {
+  async searchByText(searchText: string, filters?: { serviceTypes?: string[] }): Promise<Location[]> {
     // Get all active locations and do basic text search
     const results = await this.list('locations', {
       where: [{ field: 'status', operator: '==', value: 'active' }]
@@ -501,10 +501,19 @@ export class LocationService extends DatabaseService {
         ...doc.data()
       }))
       .filter(location => {
+        // Check if location matches service type filter
+        if (filters?.serviceTypes?.length) {
+          const locationTypes = location.serviceTypes || []
+          if (!filters.serviceTypes.some(type => locationTypes.includes(type))) {
+            return false
+          }
+        }
+
         const searchableText = [
           location.name,
           location.address,
-          location.description || ''
+          location.description || '',
+          ...(location.serviceTypes || [])
         ].join(' ').toLowerCase()
 
         // Check if any search term is found in the searchable text
@@ -515,8 +524,6 @@ export class LocationService extends DatabaseService {
 
     return filteredLocations as Location[]
   }
-
-
 
   async filterByStatus(filters: {
     status?: string[]

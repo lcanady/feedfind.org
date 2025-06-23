@@ -4,13 +4,95 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import Header from '@/components/layout/Header'
 import { useVolunteerOpportunities } from '@/hooks/useCommunity'
+import { useAuth } from '@/hooks/useAuth'
 import { HeaderAd, SidebarAd, AdSense } from '@/components/ui/AdSense'
 import { formatDistanceToNow } from 'date-fns'
 import { Timestamp } from 'firebase/firestore'
 
 export default function VolunteerPage() {
   const [filter, setFilter] = useState<string>('all')
-  const { opportunities, loading, error } = useVolunteerOpportunities(filter)
+  const { opportunities, loading, error, registerForOpportunity, cancelRegistration, isRegistered } = useVolunteerOpportunities(filter)
+  const { user } = useAuth()
+  const [registrationStatus, setRegistrationStatus] = useState<{[key: string]: 'idle' | 'loading' | 'success' | 'error'}>({})
+  const [statusMessages, setStatusMessages] = useState<{[key: string]: string}>({})
+
+  const handleRegistration = async (opportunityId: string) => {
+    if (!user) {
+      setStatusMessages(prev => ({
+        ...prev,
+        [opportunityId]: 'Please log in to register for this opportunity'
+      }))
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'error'
+      }))
+      return
+    }
+
+    try {
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'loading'
+      }))
+      await registerForOpportunity(opportunityId)
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'success'
+      }))
+      setStatusMessages(prev => ({
+        ...prev,
+        [opportunityId]: 'Successfully registered!'
+      }))
+    } catch (error) {
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'error'
+      }))
+      setStatusMessages(prev => ({
+        ...prev,
+        [opportunityId]: error instanceof Error ? error.message : 'Failed to register'
+      }))
+    }
+  }
+
+  const handleCancelRegistration = async (opportunityId: string) => {
+    if (!user) {
+      setStatusMessages(prev => ({
+        ...prev,
+        [opportunityId]: 'Please log in to cancel your registration'
+      }))
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'error'
+      }))
+      return
+    }
+
+    try {
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'loading'
+      }))
+      await cancelRegistration(opportunityId)
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'success'
+      }))
+      setStatusMessages(prev => ({
+        ...prev,
+        [opportunityId]: 'Registration cancelled'
+      }))
+    } catch (error) {
+      setRegistrationStatus(prev => ({
+        ...prev,
+        [opportunityId]: 'error'
+      }))
+      setStatusMessages(prev => ({
+        ...prev,
+        [opportunityId]: error instanceof Error ? error.message : 'Failed to cancel registration'
+      }))
+    }
+  }
 
   const formatDate = (timestamp: Timestamp | Date | undefined) => {
     if (!timestamp) return 'Recently'
@@ -111,9 +193,19 @@ export default function VolunteerPage() {
                   Ongoing ({opportunities.filter(o => o.isOngoing).length})
                 </button>
                 <button
-                  onClick={() => setFilter('event')}
+                  onClick={() => setFilter('available')}
                   className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
-                    filter === 'event'
+                    filter === 'available'
+                      ? 'bg-blue-100 text-blue-700'
+                      : 'text-gray-600 hover:bg-gray-100'
+                  }`}
+                >
+                  Available Spots ({opportunities.filter(o => o.spotsAvailable && o.spotsAvailable > 0).length})
+                </button>
+                <button
+                  onClick={() => setFilter('events')}
+                  className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                    filter === 'events'
                       ? 'bg-amber-100 text-amber-700'
                       : 'text-gray-600 hover:bg-gray-100'
                   }`}
@@ -199,99 +291,116 @@ export default function VolunteerPage() {
 
                 {/* Opportunities List */}
                 <div className="space-y-6">
-                  {opportunities.map((opportunity, index) => (
-                    <React.Fragment key={opportunity.id}>
-                      <div className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
-                        <div className="flex items-start justify-between mb-4">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-3 mb-2">
-                              <Link href={`/community/volunteer/${opportunity.id}`}>
-                                <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 cursor-pointer">{opportunity.title}</h3>
-                              </Link>
-                              <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(opportunity.urgency)}`}>
-                                {getUrgencyLabel(opportunity.urgency)}
-                              </span>
-                            </div>
-                            <div className="flex items-center text-sm text-gray-600 space-x-4 mb-3">
-                              <span className="flex items-center">
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                                {opportunity.organization}
-                              </span>
-                              <span className="flex items-center">
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                                </svg>
-                                {opportunity.location}
-                              </span>
-                              <span className="flex items-center">
-                                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                                {opportunity.timeCommitment}
-                              </span>
-                            </div>
+                  {opportunities.map((opportunity) => (
+                    <div key={opportunity.id} className="bg-white border border-gray-200 rounded-lg p-6 hover:shadow-md transition-shadow">
+                      {/* Status Message */}
+                      {statusMessages[opportunity.id] && (
+                        <div className={`mb-4 p-3 rounded-lg text-sm ${
+                          registrationStatus[opportunity.id] === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                        }`}>
+                          {statusMessages[opportunity.id]}
+                        </div>
+                      )}
+
+                      <div className="flex items-start justify-between mb-4">
+                        <div className="flex-1">
+                          <div className="flex items-center space-x-3 mb-2">
+                            <Link href={`/community/volunteer/${opportunity.id}`}>
+                              <h3 className="text-xl font-semibold text-gray-900 hover:text-blue-600 cursor-pointer">{opportunity.title}</h3>
+                            </Link>
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getUrgencyColor(opportunity.urgency)}`}>
+                              {getUrgencyLabel(opportunity.urgency)}
+                            </span>
                           </div>
-                          <div className="text-sm text-gray-500">
-                            Posted {formatDate(opportunity.createdAt)}
+                          <div className="flex items-center text-sm text-gray-600 space-x-4 mb-3">
+                            <span className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+                              </svg>
+                              {opportunity.organization}
+                            </span>
+                            <span className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                              </svg>
+                              {opportunity.location}
+                            </span>
+                            <span className="flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                              </svg>
+                              {opportunity.timeCommitment}
+                            </span>
                           </div>
                         </div>
-
-                        <p className="text-gray-600 mb-4">{opportunity.description}</p>
-
-                        {/* Skills */}
-                        {opportunity.skills && opportunity.skills.length > 0 && (
-                          <div className="mb-4">
-                            <h4 className="text-sm font-medium text-gray-900 mb-2">Skills & Requirements:</h4>
-                            <div className="flex flex-wrap gap-2">
-                              {opportunity.skills.map((skill, index) => (
-                                <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-100 text-gray-800">
-                                  {skill}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Actions */}
-                        <div className="flex items-center justify-between pt-4 border-t border-gray-200">
-                          <a 
-                            href={`mailto:${opportunity.contactEmail}?subject=Volunteer Interest: ${opportunity.title}`}
-                            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                          >
-                            Contact Organization
-                          </a>
-                          <div className="flex items-center space-x-4 text-sm text-gray-500">
-                            <button className="hover:text-blue-600">
-                              <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
-                              </svg>
-                              Save
-                            </button>
-                            <button className="hover:text-blue-600">
-                              <svg className="w-4 h-4 mr-1 inline" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.367 2.684 3 3 0 00-5.367-2.684z" />
-                              </svg>
-                              Share
-                            </button>
-                          </div>
+                        <div className="text-sm text-gray-500">
+                          Posted {formatDate(opportunity.createdAt)}
                         </div>
                       </div>
 
-                      {/* In-feed Ad */}
-                      {(index + 1) % 3 === 0 && index < opportunities.length - 1 && (
-                        <div className="py-4">
-                          <AdSense
-                            adSlot="1234567897"
-                            adFormat="horizontal"
-                            className="text-center"
-                            style={{ minHeight: '90px', backgroundColor: '#f9fafb' }}
-                          />
+                      <p className="text-gray-600 mb-4">{opportunity.description}</p>
+
+                      {/* Skills */}
+                      {opportunity.skills && opportunity.skills.length > 0 && (
+                        <div className="mb-4">
+                          <h4 className="text-sm font-medium text-gray-900 mb-2">Skills & Requirements:</h4>
+                          <div className="flex flex-wrap gap-2">
+                            {opportunity.skills.map((skill, index) => (
+                              <span key={index} className="inline-flex items-center px-2 py-1 rounded-md text-xs bg-gray-100 text-gray-800">
+                                {skill}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       )}
-                    </React.Fragment>
+
+                      {/* Actions */}
+                      <div className="flex items-center justify-between pt-4 border-t border-gray-200">
+                        <div className="flex items-center space-x-4">
+                          {registrationStatus[opportunity.id] === 'loading' ? (
+                            <div className="animate-pulse flex items-center space-x-2">
+                              <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin"></div>
+                              <span className="text-gray-500">Processing...</span>
+                            </div>
+                          ) : isRegistered(opportunity) ? (
+                            <button
+                              onClick={() => handleCancelRegistration(opportunity.id)}
+                              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                            >
+                              Cancel Registration
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => handleRegistration(opportunity.id)}
+                              disabled={!opportunity.spotsAvailable || opportunity.spotsAvailable <= 0}
+                              className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                                opportunity.spotsAvailable && opportunity.spotsAvailable > 0
+                                  ? 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                                  : 'bg-gray-400 cursor-not-allowed'
+                              }`}
+                            >
+                              {opportunity.spotsAvailable && opportunity.spotsAvailable > 0
+                                ? 'Register Now'
+                                : 'No Spots Available'}
+                            </button>
+                          )}
+                          <Link
+                            href={`/community/volunteer/${opportunity.id}`}
+                            className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+                          >
+                            View Details
+                          </Link>
+                        </div>
+                        <div className="text-sm text-gray-500">
+                          {opportunity.spotsTotal && (
+                            <span>
+                              {opportunity.spotsAvailable || 0} of {opportunity.spotsTotal} spots available
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
                   ))}
                 </div>
               </>

@@ -28,6 +28,7 @@ const CategorySection: React.FC<CategorySectionProps> = ({
     const searchParams = new URLSearchParams()
     searchParams.set('q', category.searchTerm)
     searchParams.set('type', category.slug)
+    searchParams.set('status', 'open') // Default to showing open locations
     router.push(`/search?${searchParams.toString()}`)
   }
 

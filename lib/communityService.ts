@@ -13,375 +13,337 @@ import {
   serverTimestamp,
   QueryConstraint,
   DocumentData,
-  Unsubscribe
+  Unsubscribe,
+  runTransaction,
+  deleteField,
+  DocumentReference,
+  Timestamp
 } from 'firebase/firestore'
 import { db } from './firebase'
-import { DatabaseService } from './databaseService'
-import type {
-  ForumPost,
+import {
   VolunteerOpportunity,
   CommunityEvent,
   CommunityResource,
   CreateVolunteerOpportunityData,
   CreateCommunityEventData,
-  CreateCommunityResourceData
+  CreateCommunityResourceData,
+  UpdateVolunteerOpportunityData
 } from '../types/database'
 
-// Forum Service
-export class ForumService extends DatabaseService {
-  private readonly COLLECTION_NAME = 'forum_posts'
+// Base Database Service
+abstract class DatabaseService {
+  protected readonly collectionName: string
 
-  async createPost(data: any): Promise<ForumPost> {
-    try {
-      const postData = {
-        ...data,
-        replies: 0,
-        likes: 0,
-        views: 0,
-        status: 'active',
-        isPinned: data.isPinned || false,
-        isLocked: false,
-        lastActivity: serverTimestamp(),
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }
-
-      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), postData)
-
-      return {
-        id: docRef.id,
-        ...postData,
-        lastActivity: new Date(),
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } as ForumPost
-    } catch (error) {
-      console.error('Error creating forum post:', error)
-      throw new Error('Failed to create forum post')
-    }
+  constructor(collectionName: string) {
+    this.collectionName = collectionName
   }
 
-  async getPosts(category?: string): Promise<ForumPost[]> {
+  protected async createDoc<T extends DocumentData>(data: T): Promise<string> {
     try {
-      const constraints: QueryConstraint[] = [
-        where('status', '==', 'active')
-      ]
-
-      if (category && category !== 'all') {
-        constraints.push(where('category', '==', category))
-      }
-
-      constraints.push(orderBy('lastActivity', 'desc'))
-      constraints.push(limit(20))
-
-      const q = query(collection(db, this.COLLECTION_NAME), ...constraints)
-      const snapshot = await getDocs(q)
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as ForumPost[]
-    } catch (error) {
-      console.error('Error fetching forum posts:', error)
-      return []
-    }
-  }
-
-  subscribeToPost(postId: string, callback: (post: ForumPost | null) => void): Unsubscribe {
-    const docRef = doc(db, this.COLLECTION_NAME, postId)
-    return onSnapshot(docRef, (doc) => {
-      if (doc.exists()) {
-        callback({
-          id: doc.id,
-          ...doc.data()
-        } as ForumPost)
-      } else {
-        callback(null)
-      }
-    })
-  }
-}
-
-// Volunteer Opportunities Service
-export class VolunteerService extends DatabaseService {
-  private readonly COLLECTION_NAME = 'volunteer_opportunities'
-
-  async create(data: CreateVolunteerOpportunityData): Promise<VolunteerOpportunity> {
-    try {
-      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), {
+      const docRef = await addDoc(collection(db, this.collectionName), {
         ...data,
         createdAt: serverTimestamp(),
         updatedAt: serverTimestamp()
       })
-
-      return {
-        id: docRef.id,
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } as VolunteerOpportunity
+      return docRef.id
     } catch (error) {
-      throw this.handleError(error)
+      console.error(`Error creating document in ${this.collectionName}:`, error)
+      throw error
     }
   }
 
-  async getOpportunities(filter?: string): Promise<VolunteerOpportunity[]> {
+  protected async updateDoc<T extends DocumentData>(id: string, data: T): Promise<void> {
     try {
-      const constraints: QueryConstraint[] = []
-
-      if (filter && filter !== 'all') {
-        if (filter === 'urgent') {
-          constraints.push(where('urgency', '==', 'urgent'))
-        } else if (filter === 'ongoing') {
-          constraints.push(where('isOngoing', '==', true))
-        } else if (filter === 'events') {
-          constraints.push(where('category', '==', 'events'))
-        }
-      }
-
-      constraints.push(where('status', '==', 'active'))
-      constraints.push(orderBy('createdAt', 'desc'))
-      constraints.push(limit(50))
-
-      const q = query(collection(db, this.COLLECTION_NAME), ...constraints)
-      const snapshot = await getDocs(q)
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as VolunteerOpportunity[]
+      const docRef = doc(db, this.collectionName, id)
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      })
     } catch (error) {
-      console.error('Error fetching volunteer opportunities:', error)
-      return []
+      console.error(`Error updating document in ${this.collectionName}:`, error)
+      throw error
     }
   }
 
-  subscribeToOpportunities(callback: (opportunities: VolunteerOpportunity[]) => void): Unsubscribe {
-    const q = query(
-      collection(db, this.COLLECTION_NAME),
-      where('status', '==', 'active'),
-      orderBy('urgency', 'desc'),
-      orderBy('createdAt', 'desc'),
-      limit(50)
-    )
-    
-    return onSnapshot(q, (snapshot) => {
-      const opportunities = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as VolunteerOpportunity[]
-      callback(opportunities)
+  protected async getDoc<T extends DocumentData>(id: string): Promise<T | null> {
+    try {
+      const docRef = doc(db, this.collectionName, id)
+      const docSnap = await getDoc(docRef)
+      if (!docSnap.exists()) return null
+      const data = docSnap.data()
+      return { ...data, id: docSnap.id } as unknown as T
+    } catch (error) {
+      console.error(`Error getting document from ${this.collectionName}:`, error)
+      throw error
+    }
+  }
+
+  protected subscribeToDoc<T extends DocumentData>(
+    id: string,
+    callback: (data: T | null) => void
+  ): Unsubscribe {
+    const docRef = doc(db, this.collectionName, id)
+    return onSnapshot(docRef, (docSnap) => {
+      if (!docSnap.exists()) {
+        callback(null)
+        return
+      }
+      const data = docSnap.data()
+      callback({ ...data, id: docSnap.id } as unknown as T)
     })
+  }
+
+  protected subscribeToCollection<T extends DocumentData>(
+    callback: (data: T[]) => void,
+    queryConstraints: QueryConstraint[] = []
+  ): Unsubscribe {
+    const q = query(collection(db, this.collectionName), ...queryConstraints)
+    return onSnapshot(q, (querySnapshot) => {
+      const docs = querySnapshot.docs.map(doc => {
+        const data = doc.data()
+        return { ...data, id: doc.id } as unknown as T
+      })
+      callback(docs)
+    })
+  }
+}
+
+// Volunteer Service
+export class VolunteerService extends DatabaseService {
+  constructor() {
+    super('volunteer_opportunities')
+  }
+
+  async create(data: CreateVolunteerOpportunityData): Promise<string> {
+    try {
+      const docRef = await addDoc(collection(db, this.collectionName), {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'active',
+        spotsRegistered: 0,
+        registrations: {}
+      })
+      return docRef.id
+    } catch (error) {
+      console.error('Error creating volunteer opportunity:', error)
+      throw error
+    }
+  }
+
+  async update(id: string, data: UpdateVolunteerOpportunityData): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, id)
+      await updateDoc(docRef, {
+        ...data,
+        updatedAt: serverTimestamp()
+      })
+    } catch (error) {
+      console.error('Error updating volunteer opportunity:', error)
+      throw error
+    }
+  }
+
+  async register(opportunityId: string, userId: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, opportunityId)
+      
+      await runTransaction(db, async (transaction) => {
+        const opportunityDoc = await transaction.get(docRef)
+        if (!opportunityDoc.exists()) {
+          throw new Error('Opportunity not found')
+        }
+
+        const data = opportunityDoc.data() as VolunteerOpportunity
+        
+        // Check if already registered
+        if (data.registrations?.[userId]) {
+          throw new Error('Already registered for this opportunity')
+        }
+
+        // Check if spots are available
+        if (data.spotsTotal && data.spotsRegistered && data.spotsRegistered >= data.spotsTotal) {
+          throw new Error('No spots available')
+        }
+
+        // Update registrations
+        transaction.update(docRef, {
+          [`registrations.${userId}`]: {
+            registeredAt: serverTimestamp(),
+            status: 'pending'
+          },
+          spotsRegistered: (data.spotsRegistered || 0) + 1,
+          spotsAvailable: data.spotsTotal ? data.spotsTotal - ((data.spotsRegistered || 0) + 1) : undefined,
+          updatedAt: serverTimestamp()
+        })
+      })
+    } catch (error) {
+      console.error('Error registering for volunteer opportunity:', error)
+      throw error
+    }
+  }
+
+  async cancelRegistration(opportunityId: string, userId: string): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, opportunityId)
+      
+      await runTransaction(db, async (transaction) => {
+        const opportunityDoc = await transaction.get(docRef)
+        if (!opportunityDoc.exists()) {
+          throw new Error('Opportunity not found')
+        }
+
+        const data = opportunityDoc.data() as VolunteerOpportunity
+        
+        // Check if registered
+        if (!data.registrations?.[userId]) {
+          throw new Error('Not registered for this opportunity')
+        }
+
+        // Update registrations
+        transaction.update(docRef, {
+          [`registrations.${userId}`]: deleteField(),
+          spotsRegistered: Math.max(0, (data.spotsRegistered || 1) - 1),
+          spotsAvailable: data.spotsTotal ? data.spotsTotal - Math.max(0, (data.spotsRegistered || 1) - 1) : undefined,
+          updatedAt: serverTimestamp()
+        })
+      })
+    } catch (error) {
+      console.error('Error canceling volunteer registration:', error)
+      throw error
+    }
+  }
+
+  async getOpportunity(id: string): Promise<VolunteerOpportunity | null> {
+    return this.getDoc<VolunteerOpportunity>(id)
+  }
+
+  subscribeToOpportunity(
+    id: string,
+    callback: (opportunity: VolunteerOpportunity | null) => void
+  ): Unsubscribe {
+    return this.subscribeToDoc<VolunteerOpportunity>(id, callback)
+  }
+
+  subscribeToOpportunities(
+    callback: (opportunities: VolunteerOpportunity[]) => void,
+    filter?: string
+  ): Unsubscribe {
+    const constraints: QueryConstraint[] = [
+      where('status', '==', 'active'),
+      orderBy('createdAt', 'desc')
+    ]
+
+    if (filter && filter !== 'all') {
+      switch (filter) {
+        case 'urgent':
+          constraints.push(where('urgency', '==', 'urgent'))
+          break
+        case 'ongoing':
+          constraints.push(where('isOngoing', '==', true))
+          break
+        case 'available':
+          constraints.push(where('spotsAvailable', '>', 0))
+          break
+        case 'events':
+          constraints.push(where('category', '==', 'events'))
+          break
+      }
+    }
+
+    return this.subscribeToCollection<VolunteerOpportunity>(callback, constraints)
+  }
+
+  async updateRegistrationStatus(
+    opportunityId: string,
+    userId: string,
+    status: 'approved' | 'declined'
+  ): Promise<void> {
+    try {
+      const docRef = doc(db, this.collectionName, opportunityId)
+      
+      await runTransaction(db, async (transaction) => {
+        const opportunityDoc = await transaction.get(docRef)
+        if (!opportunityDoc.exists()) {
+          throw new Error('Opportunity not found')
+        }
+
+        const data = opportunityDoc.data() as VolunteerOpportunity
+        
+        // Check if registered
+        if (!data.registrations?.[userId]) {
+          throw new Error('User not registered for this opportunity')
+        }
+
+        // Update registration status
+        transaction.update(docRef, {
+          [`registrations.${userId}.status`]: status,
+          updatedAt: serverTimestamp()
+        })
+
+        // If declined, update spots
+        if (status === 'declined') {
+          transaction.update(docRef, {
+            spotsRegistered: Math.max(0, (data.spotsRegistered || 1) - 1),
+            spotsAvailable: data.spotsTotal ? data.spotsTotal - Math.max(0, (data.spotsRegistered || 1) - 1) : undefined
+          })
+        }
+      })
+    } catch (error) {
+      console.error('Error updating registration status:', error)
+      throw error
+    }
   }
 }
 
 // Community Events Service
 export class CommunityEventsService extends DatabaseService {
-  private readonly COLLECTION_NAME = 'community_events'
-
-  async create(data: CreateCommunityEventData): Promise<CommunityEvent> {
-    try {
-      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), {
-        ...data,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      })
-
-      return {
-        id: docRef.id,
-        ...data,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } as CommunityEvent
-    } catch (error) {
-      throw this.handleError(error)
-    }
+  constructor() {
+    super('community_events')
   }
 
-  async getEvents(filter?: string): Promise<CommunityEvent[]> {
-    try {
-      const constraints: QueryConstraint[] = []
+  async create(data: CreateCommunityEventData): Promise<string> {
+    return this.createDoc<CreateCommunityEventData>(data)
+  }
 
-      if (filter && filter !== 'all') {
-        if (filter === 'today') {
-          constraints.push(where('status', '==', 'today'))
-        } else {
-          constraints.push(where('type', '==', filter))
-        }
-      }
-
-      constraints.push(orderBy('date', 'asc'))
-      constraints.push(limit(50))
-
-      const q = query(collection(db, this.COLLECTION_NAME), ...constraints)
-      const snapshot = await getDocs(q)
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CommunityEvent[]
-    } catch (error) {
-      console.error('Error fetching community events:', error)
-      return []
-    }
+  async getEvent(id: string): Promise<CommunityEvent | null> {
+    return this.getDoc<CommunityEvent>(id)
   }
 
   subscribeToEvents(callback: (events: CommunityEvent[]) => void): Unsubscribe {
-    const q = query(
-      collection(db, this.COLLECTION_NAME),
-      where('status', 'in', ['upcoming', 'today', 'ongoing']),
-      orderBy('date', 'asc'),
-      limit(50)
-    )
-    
-    return onSnapshot(q, (snapshot) => {
-      const events = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CommunityEvent[]
-      callback(events)
-    })
+    const constraints: QueryConstraint[] = [
+      where('status', '==', 'active'),
+      orderBy('startDate', 'asc'),
+      where('startDate', '>=', Timestamp.fromDate(new Date()))
+    ]
+    return this.subscribeToCollection<CommunityEvent>(callback, constraints)
   }
 }
 
 // Community Resources Service
 export class CommunityResourcesService extends DatabaseService {
-  private readonly COLLECTION_NAME = 'community_resources'
-
-  async create(data: CreateCommunityResourceData): Promise<CommunityResource> {
-    try {
-      const resourceData = {
-        ...data,
-        views: 0,
-        likes: 0,
-        shares: 0,
-        status: 'active' as const,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      }
-
-      const docRef = await addDoc(collection(db, this.COLLECTION_NAME), resourceData)
-
-      return {
-        id: docRef.id,
-        ...resourceData,
-        createdAt: new Date(),
-        updatedAt: new Date()
-      } as CommunityResource
-    } catch (error) {
-      throw this.handleError(error)
-    }
+  constructor() {
+    super('community_resources')
   }
 
-  async getResources(category?: string): Promise<CommunityResource[]> {
-    try {
-      const constraints: QueryConstraint[] = [
-        where('status', '==', 'active')
-      ]
+  async create(data: CreateCommunityResourceData): Promise<string> {
+    return this.createDoc<CreateCommunityResourceData>(data)
+  }
 
-      if (category && category !== 'all') {
-        constraints.push(where('category', '==', category))
-      }
-
-      constraints.push(orderBy('likes', 'desc'))
-      constraints.push(limit(50))
-
-      const q = query(collection(db, this.COLLECTION_NAME), ...constraints)
-      const snapshot = await getDocs(q)
-
-      return snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CommunityResource[]
-    } catch (error) {
-      console.error('Error fetching community resources:', error)
-      return []
-    }
+  async getResource(id: string): Promise<CommunityResource | null> {
+    return this.getDoc<CommunityResource>(id)
   }
 
   subscribeToResources(callback: (resources: CommunityResource[]) => void): Unsubscribe {
-    const q = query(
-      collection(db, this.COLLECTION_NAME),
+    const constraints: QueryConstraint[] = [
       where('status', '==', 'active'),
-      orderBy('likes', 'desc'),
-      limit(50)
-    )
-    
-    return onSnapshot(q, (snapshot) => {
-      const resources = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-      })) as CommunityResource[]
-      callback(resources)
-    })
+      orderBy('createdAt', 'desc')
+    ]
+    return this.subscribeToCollection<CommunityResource>(callback, constraints)
   }
 }
 
-// Community Stats Service
-export class CommunityStatsService extends DatabaseService {
-  async getCommunityStats(): Promise<{
-    totalMembers: number
-    totalPosts: number
-    totalResources: number
-    totalEvents: number
-    volunteerHours: number
-  }> {
-    try {
-      // This would typically aggregate data from multiple collections
-      // For now, we'll return mock data that matches our UI
-      return {
-        totalMembers: 2847,
-        totalPosts: 1203,
-        totalResources: 456,
-        totalEvents: 89,
-        volunteerHours: 1203
-      }
-    } catch (error) {
-      throw this.handleError(error)
-    }
-  }
-
-  async getRecentActivity(): Promise<Array<{
-    id: string
-    type: 'post' | 'resource' | 'event' | 'opportunity'
-    title: string
-    author: string
-    date: Date
-  }>> {
-    try {
-      // This would aggregate recent activity from all community collections
-      return [
-        {
-          id: '1',
-          type: 'post',
-          title: 'Tips for first-time food pantry visits',
-          author: 'Sarah M.',
-          date: new Date(Date.now() - 2 * 60 * 60 * 1000)
-        },
-        {
-          id: '2',
-          type: 'resource',
-          title: 'SNAP Benefits Application Guide',
-          author: 'Community Team',
-          date: new Date(Date.now() - 4 * 60 * 60 * 1000)
-        },
-        {
-          id: '3',
-          type: 'event',
-          title: 'Weekend Mobile Food Pantry',
-          author: 'Food Bank LA',
-          date: new Date(Date.now() - 6 * 60 * 60 * 1000)
-        }
-      ]
-    } catch (error) {
-      throw this.handleError(error)
-    }
-  }
-}
-
-// Export service instances
-export const forumService = new ForumService()
+// Service Instances
 export const volunteerService = new VolunteerService()
 export const communityEventsService = new CommunityEventsService()
 export const communityResourcesService = new CommunityResourcesService()
-export const communityStatsService = new CommunityStatsService()

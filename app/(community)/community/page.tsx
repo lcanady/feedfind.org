@@ -222,13 +222,14 @@ export default function CommunityPage() {
                   ))
                 ) : (
                   recentActivity.map((activity) => {
-                    const getActivityIcon = (type: string) => {
+                    const getActivityIcon = (type: string, author: string = 'Anonymous') => {
+                      const initials = author.split(' ').map(n => n[0]).join('').toUpperCase()
                       switch (type) {
-                        case 'post': return { bg: 'bg-blue-100', text: 'text-blue-600', initials: activity.author.split(' ').map(n => n[0]).join('') }
-                        case 'resource': return { bg: 'bg-purple-100', text: 'text-purple-600', initials: activity.author.split(' ').map(n => n[0]).join('') }
-                        case 'event': return { bg: 'bg-amber-100', text: 'text-amber-600', initials: activity.author.split(' ').map(n => n[0]).join('') }
-                        case 'opportunity': return { bg: 'bg-green-100', text: 'text-green-600', initials: activity.author.split(' ').map(n => n[0]).join('') }
-                        default: return { bg: 'bg-gray-100', text: 'text-gray-600', initials: activity.author.split(' ').map(n => n[0]).join('') }
+                        case 'post': return { bg: 'bg-blue-100', text: 'text-blue-600', initials }
+                        case 'resource': return { bg: 'bg-purple-100', text: 'text-purple-600', initials }
+                        case 'event': return { bg: 'bg-amber-100', text: 'text-amber-600', initials }
+                        case 'opportunity': return { bg: 'bg-green-100', text: 'text-green-600', initials }
+                        default: return { bg: 'bg-gray-100', text: 'text-gray-600', initials }
                       }
                     }
                     
@@ -242,11 +243,11 @@ export default function CommunityPage() {
                       }
                     }
 
-                    const icon = getActivityIcon(activity.type)
-                    const timeAgo = Math.floor((Date.now() - activity.date.getTime()) / (1000 * 60 * 60))
+                    const icon = getActivityIcon(activity.type, activity.author)
+                    const timeAgo = Math.floor((Date.now() - (activity.date instanceof Date ? activity.date.getTime() : activity.date.toMillis())) / (1000 * 60 * 60))
 
                     return (
-                      <div key={activity.id} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
+                      <div key={activity.data.id} className="flex items-start space-x-4 p-4 bg-gray-50 rounded-lg">
                         <div className={`w-10 h-10 ${icon.bg} rounded-full flex items-center justify-center`}>
                           <span className={`text-sm font-medium ${icon.text}`}>{icon.initials}</span>
                         </div>

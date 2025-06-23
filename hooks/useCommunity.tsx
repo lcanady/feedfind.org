@@ -1,22 +1,152 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { Unsubscribe } from 'firebase/firestore'
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { Unsubscribe, Timestamp } from 'firebase/firestore'
 import {
   volunteerService,
   communityEventsService,
-  communityResourcesService,
-  communityStatsService
+  communityResourcesService
 } from '../lib/communityService'
 import { forumService } from '../lib/forumService'
 import type {
-  ForumPost,
   VolunteerOpportunity,
   CommunityEvent,
-  CommunityResource
+  CommunityResource,
+  ForumPost
 } from '../types/database'
+import { useAuth } from '@/hooks/useAuth'
 
-// Forum Hook
+// Volunteer Opportunities Hook
+export function useVolunteerOpportunities(filter?: string) {
+  const [opportunities, setOpportunities] = useState<VolunteerOpportunity[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+
+    const unsubscribe = volunteerService.subscribeToOpportunities((updatedOpportunities) => {
+      setOpportunities(updatedOpportunities)
+      setLoading(false)
+    }, filter)
+
+    return () => unsubscribe()
+  }, [filter])
+
+  const registerForOpportunity = useCallback(async (opportunityId: string) => {
+    if (!user) throw new Error('Must be logged in to register')
+    await volunteerService.register(opportunityId, user.uid)
+  }, [user])
+
+  const cancelRegistration = useCallback(async (opportunityId: string) => {
+    if (!user) throw new Error('Must be logged in to cancel registration')
+    await volunteerService.cancelRegistration(opportunityId, user.uid)
+  }, [user])
+
+  const isRegistered = useCallback((opportunity: VolunteerOpportunity) => {
+    if (!user) return false
+    return !!opportunity.registrations?.[user.uid]
+  }, [user])
+
+  return {
+    opportunities,
+    loading,
+    error,
+    registerForOpportunity,
+    cancelRegistration,
+    isRegistered
+  }
+}
+
+// Single Volunteer Opportunity Hook
+export function useVolunteerOpportunity(opportunityId: string) {
+  const [opportunity, setOpportunity] = useState<VolunteerOpportunity | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+
+    const unsubscribe = volunteerService.subscribeToOpportunity(opportunityId, (updatedOpportunity) => {
+      setOpportunity(updatedOpportunity)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [opportunityId])
+
+  const register = useCallback(async () => {
+    if (!user) throw new Error('Must be logged in to register')
+    await volunteerService.register(opportunityId, user.uid)
+  }, [opportunityId, user])
+
+  const cancelRegistration = useCallback(async () => {
+    if (!user) throw new Error('Must be logged in to cancel registration')
+    await volunteerService.cancelRegistration(opportunityId, user.uid)
+  }, [opportunityId, user])
+
+  const isRegistered = useMemo(() => {
+    if (!user || !opportunity) return false
+    return !!opportunity.registrations?.[user.uid]
+  }, [opportunity, user])
+
+  return {
+    opportunity,
+    loading,
+    error,
+    register,
+    cancelRegistration,
+    isRegistered
+  }
+}
+
+// Community Events Hook
+export function useCommunityEvents() {
+  const [events, setEvents] = useState<CommunityEvent[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+
+    const unsubscribe = communityEventsService.subscribeToEvents((updatedEvents) => {
+      setEvents(updatedEvents)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  return { events, loading, error }
+}
+
+// Community Resources Hook
+export function useCommunityResources() {
+  const [resources, setResources] = useState<CommunityResource[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    setLoading(true)
+    setError(null)
+
+    const unsubscribe = communityResourcesService.subscribeToResources((updatedResources) => {
+      setResources(updatedResources)
+      setLoading(false)
+    })
+
+    return () => unsubscribe()
+  }, [])
+
+  return { resources, loading, error }
+}
+
+// Forum Posts Hook
 export function useForumPosts(category?: string) {
   const [posts, setPosts] = useState<ForumPost[]>([])
   const [loading, setLoading] = useState(true)
@@ -31,216 +161,105 @@ export function useForumPosts(category?: string) {
       setLoading(false)
     }, category)
 
-    // Cleanup subscription on unmount or category change
     return () => unsubscribe()
   }, [category])
 
   return { posts, loading, error }
 }
 
-// Volunteer Opportunities Hook
-export function useVolunteerOpportunities(filter?: string) {
-  const [opportunities, setOpportunities] = useState<VolunteerOpportunity[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchOpportunities = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const fetchedOpportunities = await volunteerService.getOpportunities(filter)
-      setOpportunities(fetchedOpportunities)
-    } catch (error) {
-      console.error('Error fetching volunteer opportunities:', error)
-      setError('Failed to load volunteer opportunities')
-      setOpportunities([])
-    } finally {
-      setLoading(false)
-    }
-  }, [filter])
-
-  useEffect(() => {
-    fetchOpportunities()
-  }, [fetchOpportunities])
-
-  // Real-time subscription
-  useEffect(() => {
-    if (!filter || filter === 'all') {
-      const unsubscribe = volunteerService.subscribeToOpportunities((updatedOpportunities) => {
-        setOpportunities(updatedOpportunities)
-        setLoading(false)
-      })
-
-      return () => unsubscribe()
-    }
-  }, [filter])
-
-  return { 
-    opportunities, 
-    loading, 
-    error, 
-    refetch: fetchOpportunities 
-  }
-}
-
-// Community Events Hook
-export function useCommunityEvents(filter?: string) {
-  const [events, setEvents] = useState<CommunityEvent[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchEvents = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const fetchedEvents = await communityEventsService.getEvents(filter)
-      setEvents(fetchedEvents)
-    } catch (error) {
-      console.error('Error fetching community events:', error)
-      setError('Failed to load community events')
-      setEvents([])
-    } finally {
-      setLoading(false)
-    }
-  }, [filter])
-
-  useEffect(() => {
-    fetchEvents()
-  }, [fetchEvents])
-
-  // Real-time subscription
-  useEffect(() => {
-    if (!filter || filter === 'all') {
-      const unsubscribe = communityEventsService.subscribeToEvents((updatedEvents) => {
-        setEvents(updatedEvents)
-        setLoading(false)
-      })
-
-      return () => unsubscribe()
-    }
-  }, [filter])
-
-  return { 
-    events, 
-    loading, 
-    error, 
-    refetch: fetchEvents 
-  }
-}
-
-// Community Resources Hook
-export function useCommunityResources(category?: string) {
-  const [resources, setResources] = useState<CommunityResource[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchResources = useCallback(async () => {
-    try {
-      setLoading(true)
-      setError(null)
-      const fetchedResources = await communityResourcesService.getResources(category)
-      setResources(fetchedResources)
-    } catch (error) {
-      console.error('Error fetching community resources:', error)
-      setError('Failed to load community resources')
-      setResources([])
-    } finally {
-      setLoading(false)
-    }
-  }, [category])
-
-  useEffect(() => {
-    fetchResources()
-  }, [fetchResources])
-
-  // Real-time subscription
-  useEffect(() => {
-    if (!category || category === 'all') {
-      const unsubscribe = communityResourcesService.subscribeToResources((updatedResources) => {
-        setResources(updatedResources)
-        setLoading(false)
-      })
-
-      return () => unsubscribe()
-    }
-  }, [category])
-
-  return { 
-    resources, 
-    loading, 
-    error, 
-    refetch: fetchResources 
-  }
-}
-
-// Community Stats Hook
-export function useCommunityStats() {
-  const [stats, setStats] = useState({
-    totalMembers: 0,
-    totalPosts: 0,
-    totalResources: 0,
-    totalEvents: 0,
-    volunteerHours: 0
-  })
-  const [recentActivity, setRecentActivity] = useState<Array<{
-    id: string
-    type: 'post' | 'resource' | 'event' | 'opportunity'
-    title: string
-    author: string
-    date: Date
-  }>>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    const fetchStats = async () => {
-      try {
-        setLoading(true)
-        setError(null)
-        
-        const [statsData, activityData] = await Promise.all([
-          communityStatsService.getCommunityStats(),
-          communityStatsService.getRecentActivity()
-        ])
-        
-        setStats(statsData)
-        setRecentActivity(activityData)
-      } catch (error) {
-        console.error('Error fetching community stats:', error)
-        setError('Failed to load community statistics')
-      } finally {
-        setLoading(false)
-      }
-    }
-
-    fetchStats()
-  }, [])
-
-  return { 
-    stats, 
-    recentActivity, 
-    loading, 
-    error 
-  }
-}
-
-// Combined Community Hook for the main community page
+// Combined Community Data Hook
 export function useCommunityData() {
-  const { stats, recentActivity, loading: statsLoading } = useCommunityStats()
-  const { posts, loading: postsLoading } = useForumPosts()
-  const { opportunities, loading: opportunitiesLoading } = useVolunteerOpportunities()
-  const { events, loading: eventsLoading } = useCommunityEvents()
-  const { resources, loading: resourcesLoading } = useCommunityResources()
+  const { opportunities, loading: loadingOpportunities } = useVolunteerOpportunities()
+  const { events, loading: loadingEvents } = useCommunityEvents()
+  const { resources, loading: loadingResources } = useCommunityResources()
 
-  const loading = statsLoading || postsLoading || opportunitiesLoading || eventsLoading || resourcesLoading
+  // Compute loading state
+  const loading = loadingOpportunities || loadingEvents || loadingResources
+
+  // Mock stats for now - these should come from a real stats service later
+  const stats = {
+    totalMembers: 1234,
+    volunteerHours: 5678,
+    totalResources: resources.length,
+    totalEvents: events.length
+  }
+
+  // Get recent activity
+  const recentActivity = useMemo(() => {
+    const allActivity = [
+      ...opportunities.map(o => ({ 
+        type: 'opportunity', 
+        data: o, 
+        date: o.createdAt,
+        author: o.organization || 'Anonymous',
+        title: o.title
+      })),
+      ...events.map(e => ({ 
+        type: 'event', 
+        data: e, 
+        date: e.createdAt,
+        author: e.organization || 'Anonymous',
+        title: e.title
+      })),
+      ...resources.map(r => ({ 
+        type: 'resource', 
+        data: r, 
+        date: r.createdAt,
+        author: r.author || 'Anonymous',
+        title: r.title
+      }))
+    ]
+    return allActivity
+      .sort((a, b) => {
+        const dateA = a.date instanceof Timestamp ? a.date.toMillis() : a.date.getTime()
+        const dateB = b.date instanceof Timestamp ? b.date.toMillis() : b.date.getTime()
+        return dateB - dateA
+      })
+      .slice(0, 5)
+  }, [opportunities, events, resources])
+
+  // Get recent forum posts (mock data for now)
+  const recentPosts: ForumPost[] = []
+
+  // Get upcoming events
+  const upcomingEvents = useMemo(() => {
+    const now = new Date()
+    return events
+      .filter(event => {
+        const eventDate = event.startDate instanceof Timestamp ? 
+          event.startDate.toDate() : 
+          event.startDate
+        return eventDate > now
+      })
+      .sort((a, b) => {
+        const dateA = a.startDate instanceof Timestamp ? a.startDate.toDate() : a.startDate
+        const dateB = b.startDate instanceof Timestamp ? b.startDate.toDate() : b.startDate
+        return dateA.getTime() - dateB.getTime()
+      })
+      .slice(0, 3)
+  }, [events])
+
+  // Get featured opportunities
+  const featuredOpportunities = useMemo(() => {
+    return opportunities
+      .filter(opp => opp.urgency === 'urgent' || opp.urgency === 'high')
+      .slice(0, 3)
+  }, [opportunities])
+
+  // Get popular resources
+  const popularResources = useMemo(() => {
+    return resources
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .slice(0, 3)
+  }, [resources])
 
   return {
     stats,
     recentActivity,
-    recentPosts: posts.slice(0, 3),
-    upcomingEvents: events.slice(0, 3),
-    featuredOpportunities: opportunities.slice(0, 3),
-    popularResources: resources.slice(0, 3),
+    recentPosts,
+    upcomingEvents,
+    featuredOpportunities,
+    popularResources,
     loading
   }
 } 

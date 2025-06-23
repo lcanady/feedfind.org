@@ -11,6 +11,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'feedfind - find food assistance near you',
   description: 'Find food assistance, food banks, soup kitchens, and pantries near you with real-time availability updates.',
+  metadataBase: new URL('https://feedfind.org'),
+  verification: {
+    google: process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID?.replace('ca-pub-', '') || '',
+  },
 }
 
 export default function RootLayout({
@@ -25,12 +29,22 @@ export default function RootLayout({
         {process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID && 
          process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID !== 'ca-pub-1234567890123456' && 
          process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID !== 'ca-pub-your-client-id' && (
-          <Script
-            async
-            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
-            crossOrigin="anonymous"
-            strategy="afterInteractive"
-          />
+          <>
+            <meta 
+              name="google-adsense-account"
+              content={process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}
+            />
+            <Script
+              id="google-adsense"
+              async
+              src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${process.env.NEXT_PUBLIC_ADSENSE_CLIENT_ID}`}
+              crossOrigin="anonymous"
+              strategy="afterInteractive"
+              onError={(e) => {
+                console.error('AdSense script failed to load:', e)
+              }}
+            />
+          </>
         )}
       </head>
       <body 

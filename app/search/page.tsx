@@ -3,13 +3,12 @@
 import React, { useState, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import { Suspense as ReactSuspense } from 'react'
 import Header from '../../components/layout/Header'
 import { MainSearchForm } from '../../components/search/MainSearchForm'
 import MapViewToggle from '../../components/search/MapViewToggle'
 import { FooterAd } from '../../components/ui/AdSense'
 import type { LocationSearchResult } from '../../types/database'
-
+import { useLocationSearch } from '../../hooks/useLocationSearch'
 import { AdSense, HeaderAd, SidebarAd, FooterAd as FooterAdComponent } from '@/components/ui/AdSense'
 
 function SearchPageContent() {
@@ -20,11 +19,61 @@ function SearchPageContent() {
   const [selectedLocation, setSelectedLocation] = useState<LocationSearchResult | null>(null)
   const [userLocation, setUserLocation] = useState<{ latitude: number; longitude: number } | undefined>()
   const searchParams = useSearchParams()
+  const { searchLocations, loading: searchLoading, error: searchError, results: searchResults } = useLocationSearch()
 
   // Get initial query from URL parameters
   const initialQuery = searchParams.get('q') || ''
+  const initialType = searchParams.get('type') || undefined
   const initialStatus = searchParams.get('status') || undefined
-  const initialRadius = searchParams.get('radius') || undefined
+  const initialRadius = searchParams.get('radius') ? parseInt(searchParams.get('radius') || '10') : 10
+
+  // Execute initial search when component mounts
+  useEffect(() => {
+    if (initialQuery) {
+      const executeSearch = async () => {
+        setLoading(true)
+        setError('')
+        
+        try {
+          const searchQuery = {
+            type: 'address' as const,
+            value: initialQuery
+          }
+          
+          const filters = {
+            radius: initialRadius,
+            ...(initialStatus && { currentStatus: [initialStatus] }),
+            ...(initialType && { serviceTypes: [initialType] })
+          }
+          
+          await searchLocations(searchQuery, filters)
+        } catch (err: any) {
+          setError(err.message || 'Failed to execute search')
+        } finally {
+          setLoading(false)
+        }
+      }
+      
+      executeSearch()
+    }
+  }, [initialQuery, initialType, initialStatus, initialRadius, searchLocations])
+
+  // Update local results when search results change
+  useEffect(() => {
+    setResults(searchResults)
+  }, [searchResults])
+
+  // Update loading state
+  useEffect(() => {
+    setLoading(searchLoading)
+  }, [searchLoading])
+
+  // Update error state
+  useEffect(() => {
+    if (searchError) {
+      setError(searchError)
+    }
+  }, [searchError])
 
   // Get user's location on mount
   useEffect(() => {
@@ -42,18 +91,6 @@ function SearchPageContent() {
       )
     }
   }, [])
-
-  const handleResults = (searchResults: LocationSearchResult[]) => {
-    setResults(searchResults)
-  }
-
-  const handleError = (errorMessage: string) => {
-    setError(errorMessage)
-  }
-
-  const handleLoading = (isLoading: boolean) => {
-    setLoading(isLoading)
-  }
 
   const handleLocationSelect = (location: LocationSearchResult) => {
     setSelectedLocation(location)
@@ -117,251 +154,82 @@ function SearchPageContent() {
                 userLocation={userLocation}
               />
               
-                             {!showMap && (
+              {!showMap && (
                 <div className="grid gap-6">
-                {results.map((result, index) => (
-                  <div key={result.location.id || index} className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
-                    <div className="flex justify-between items-start mb-4">
-                      <div>
-                        <h3 className="text-lg font-semibold text-gray-900 mb-1">
-                          {result.location.name}
-                        </h3>
-                        <p className="text-gray-600 mb-2">
-                          {result.location.address}
-                        </p>
-                        {result.distance && (
-                          <p className="text-sm text-gray-500">
-                            {result.distance.toFixed(1)} miles away
+                  {results.map((result, index) => (
+                    <div key={result.location.id || index} className="bg-white rounded-lg shadow-md p-6 border border-gray-200">
+                      <div className="flex justify-between items-start mb-4">
+                        <div>
+                          <h3 className="text-lg font-semibold text-gray-900 mb-1">
+                            {result.location.name}
+                          </h3>
+                          <p className="text-gray-600 mb-2">
+                            {result.location.address}
                           </p>
-                        )}
-                      </div>
-                      
-                      <div className="flex flex-col items-end">
-                        {/* Status Badge */}
-                        <span 
-                          className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2 ${
-                            result.currentStatus === 'open' 
-                              ? 'bg-green-100 text-green-800'
-                              : result.currentStatus === 'limited'
-                              ? 'bg-yellow-100 text-yellow-800'
-                              : 'bg-red-100 text-red-800'
-                          }`}
-                        >
-                                                     {result.currentStatus === 'open' && '🟢 Open'}
-                           {result.currentStatus === 'limited' && '🟡 Limited'}
-                           {result.currentStatus === 'closed' && '🔴 Closed'}
-                           {!result.currentStatus && '❓ Status Unknown'}
-                        </span>
+                          {result.distance && (
+                            <p className="text-sm text-gray-500">
+                              {result.distance.toFixed(1)} miles away
+                            </p>
+                          )}
+                        </div>
                         
-                        {/* Rating */}
-                        {result.rating && (
-                          <div className="flex items-center">
-                            <span className="text-yellow-400 mr-1">★</span>
-                            <span className="text-sm text-gray-600">
-                              {result.rating.toFixed(1)} ({result.reviewCount || 0} reviews)
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Description */}
-                    {result.location.description && (
-                      <p className="text-gray-700 mb-4 text-sm">
-                        {result.location.description}
-                      </p>
-                    )}
-
-                    {/* Operating Hours */}
-                    {result.location.operatingHours && (
-                      <div className="mb-4">
-                        <h4 className="font-medium text-gray-900 mb-3">Hours</h4>
-                        <div className="bg-gray-50 rounded-lg p-3">
-                          <div className="space-y-1">
-                            {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'].map((day) => {
-                              const dayHours = result.location.operatingHours?.[day as keyof typeof result.location.operatingHours]
-                              const isToday = day === ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday'][new Date().getDay() === 0 ? 6 : new Date().getDay() - 1]
-                              const dayLabels: Record<string, string> = {
-                                monday: 'Monday', tuesday: 'Tuesday', wednesday: 'Wednesday',
-                                thursday: 'Thursday', friday: 'Friday', saturday: 'Saturday', sunday: 'Sunday'
-                              }
-                              
-                              const formatTime = (time: string) => {
-                                if (time.includes('AM') || time.includes('PM')) return time
-                                const [hours, minutes] = time.split(':')
-                                const hour = parseInt(hours)
-                                const ampm = hour >= 12 ? 'PM' : 'AM'
-                                const displayHour = hour === 0 ? 12 : hour > 12 ? hour - 12 : hour
-                                return `${displayHour}:${minutes} ${ampm}`
-                              }
-                              
-                              const isDayOpen = dayHours && !dayHours.closed && dayHours.open && dayHours.close
-                              
-                              return (
-                                <div 
-                                  key={day} 
-                                  className={`flex justify-between items-center py-1 px-2 rounded ${
-                                    isToday ? 'bg-blue-100 border-l-2 border-blue-500' : ''
-                                  }`}
-                                >
-                                  <span className={`text-sm ${
-                                    isToday ? 'font-semibold text-blue-900' : 'text-gray-700'
-                                  }`}>
-                                    {dayLabels[day]}
-                                    {isToday && <span className="ml-1 text-xs text-blue-600">(Today)</span>}
-                                  </span>
-                                  <span className={`text-sm ${
-                                    isDayOpen 
-                                      ? (isToday ? 'font-semibold text-green-800' : 'text-gray-900')
-                                      : (isToday ? 'font-semibold text-red-800' : 'text-gray-500')
-                                  }`}>
-                                    {isDayOpen 
-                                      ? `${formatTime(dayHours.open)} - ${formatTime(dayHours.close)}`
-                                      : 'Closed'
-                                    }
-                                  </span>
-                                </div>
-                              )
-                            })}
-                          </div>
+                        <div className="flex flex-col items-end">
+                          {/* Status Badge */}
+                          <span 
+                            className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium mb-2 ${
+                              result.currentStatus === 'open' 
+                                ? 'bg-green-100 text-green-800'
+                                : result.currentStatus === 'limited'
+                                ? 'bg-yellow-100 text-yellow-800'
+                                : 'bg-red-100 text-red-800'
+                            }`}
+                          >
+                            {result.currentStatus === 'open' && '🟢 Open'}
+                            {result.currentStatus === 'limited' && '🟡 Limited'}
+                            {result.currentStatus === 'closed' && '🔴 Closed'}
+                            {!result.currentStatus && '❓ Status Unknown'}
+                          </span>
                           
-                          {/* Quick summary */}
-                          <div className="mt-3 pt-3 border-t border-gray-200">
-                            <div className="text-xs text-gray-600">
-                              <span className="font-medium">Open: </span>
-                              {['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
-                                .filter(day => {
-                                  const dayHours = result.location.operatingHours?.[day as keyof typeof result.location.operatingHours]
-                                  return dayHours && !dayHours.closed && dayHours.open && dayHours.close
-                                })
-                                .map(day => day.slice(0, 3).charAt(0).toUpperCase() + day.slice(1, 3))
-                                .join(', ') || 'No regular hours'}
+                          {/* Rating */}
+                          {result.rating && (
+                            <div className="flex items-center">
+                              <span className="text-yellow-400 mr-1">★</span>
+                              <span className="text-sm text-gray-600">
+                                {result.rating.toFixed(1)} ({result.reviewCount || 0} reviews)
+                              </span>
                             </div>
-                          </div>
+                          )}
                         </div>
                       </div>
-                    )}
 
-                    {/* Contact Info */}
-                    <div className="flex flex-wrap gap-4 text-sm">
-                      {result.location.phone && (
-                        <a 
-                          href={`tel:${result.location.phone}`}
-                          className="text-purple-600 hover:text-purple-700 flex items-center"
-                        >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
-                          </svg>
-                          {result.location.phone}
-                        </a>
+                      {/* Description */}
+                      {result.location.description && (
+                        <p className="text-gray-700 mb-4 text-sm">
+                          {result.location.description}
+                        </p>
                       )}
-                      
-                      {result.location.website && (
-                        <a 
-                          href={result.location.website}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-purple-600 hover:text-purple-700 flex items-center"
+
+                      {/* View Details Button */}
+                      <div className="mt-4">
+                        <Link
+                          href={`/location/${result.location.id}`}
+                          className="inline-flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                         >
-                          <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                          </svg>
-                          Website
-                        </a>
-                      )}
-                      
-                      <a 
-                        href={`https://maps.google.com/?q=${encodeURIComponent(result.location.address)}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-purple-600 hover:text-purple-700 flex items-center"
-                      >
-                        <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-                        </svg>
-                        Directions
-                      </a>
+                          View Details
+                        </Link>
+                      </div>
                     </div>
-
-                                         {/* Last Updated */}
-                     {result.lastUpdated && (
-                       <p className="text-xs text-gray-400 mt-4 border-t pt-3">
-                         Status last updated: {
-                           result.lastUpdated instanceof Date 
-                             ? result.lastUpdated.toLocaleDateString()
-                             : new Date((result.lastUpdated as { seconds: number }).seconds * 1000).toLocaleDateString()
-                         }
-                       </p>
-                     )}
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
               )}
             </div>
           )}
 
-          {!loading && results.length === 0 && !error && (
-            <div className="text-center py-12">
-              <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">Start Your Search</h3>
-              <p className="text-gray-600">
-                Enter your ZIP code or address above to find food assistance locations near you.
-              </p>
+          {!loading && !error && results.length === 0 && initialQuery && (
+            <div className="text-center py-8">
+              <p className="text-gray-600">No locations found matching your search criteria.</p>
             </div>
           )}
-        </div>
-      </div>
-
-      {/* Footer */}
-      <div className="border-t border-gray-200 bg-gray-50 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          {/* Non-obtrusive footer ad */}
-          <FooterAd />
-          
-          <div className="grid md:grid-cols-4 gap-6 text-sm">
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">about</h3>
-              <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">help & FAQ</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">safety tips</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">terms of use</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">providers</h3>
-              <ul className="space-y-1">
-                <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
-                <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
-                <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
-                <li><Link href="/bulkposting" className="text-blue-600 hover:underline">bulk posting</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">community</h3>
-              <ul className="space-y-1">
-                <li><Link href="/community/volunteer" className="text-blue-600 hover:underline">volunteer opportunities</Link></li>
-                <li><a href="#" className="text-blue-600 hover:underline">donate to local organizations</a></li>
-                <li><Link href="/community/forums" className="text-blue-600 hover:underline">community forums</Link></li>
-                <li><Link href="/community/resources" className="text-blue-600 hover:underline">resource guides</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">contact</h3>
-              <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">report an issue</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">suggest improvements</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">partnership inquiries</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">feedback</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-6 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-            <p>© 2025 feedfind.org - connecting communities with food assistance resources</p>
-          </div>
         </div>
       </div>
     </main>
@@ -370,17 +238,7 @@ function SearchPageContent() {
 
 export default function SearchPage() {
   return (
-    <Suspense fallback={
-      <main id="main-content" className="min-h-screen bg-gray-50">
-        <Header />
-        <div className="container mx-auto px-4 py-8">
-          <div className="max-w-4xl mx-auto text-center">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-            <p className="text-gray-600">Loading search...</p>
-          </div>
-        </div>
-      </main>
-    }>
+    <Suspense fallback={<div>Loading...</div>}>
       <SearchPageContent />
     </Suspense>
   )

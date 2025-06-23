@@ -4,15 +4,91 @@ import React, { useState } from 'react'
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
 import Header from '@/components/layout/Header'
-import { useVolunteerOpportunities } from '@/hooks/useCommunity'
+import { useVolunteerOpportunity } from '@/hooks/useCommunity'
+import { useAuth } from '@/hooks/useAuth'
 
 export default function VolunteerOpportunityPage() {
   const params = useParams()
   const opportunityId = params.id as string
-  const [hasApplied, setHasApplied] = useState(false)
-  
-  const { opportunities, loading } = useVolunteerOpportunities()
-  const opportunity = opportunities.find(o => o.id === opportunityId)
+  const { user } = useAuth()
+  const {
+    opportunity,
+    loading,
+    error,
+    register,
+    cancelRegistration,
+    isRegistered
+  } = useVolunteerOpportunity(opportunityId)
+
+  const [registrationStatus, setRegistrationStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle')
+  const [statusMessage, setStatusMessage] = useState('')
+
+  const handleRegistration = async () => {
+    if (!user) {
+      setStatusMessage('Please log in to register for this opportunity')
+      setRegistrationStatus('error')
+      return
+    }
+
+    try {
+      setRegistrationStatus('loading')
+      await register()
+      setRegistrationStatus('success')
+      setStatusMessage('Successfully registered!')
+    } catch (error) {
+      setRegistrationStatus('error')
+      setStatusMessage(error instanceof Error ? error.message : 'Failed to register')
+    }
+  }
+
+  const handleCancelRegistration = async () => {
+    if (!user) {
+      setStatusMessage('Please log in to cancel your registration')
+      setRegistrationStatus('error')
+      return
+    }
+
+    try {
+      setRegistrationStatus('loading')
+      await cancelRegistration()
+      setRegistrationStatus('success')
+      setStatusMessage('Registration cancelled')
+    } catch (error) {
+      setRegistrationStatus('error')
+      setStatusMessage(error instanceof Error ? error.message : 'Failed to cancel registration')
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header />
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+            <p className="mt-4 text-gray-600">Loading opportunity details...</p>
+          </div>
+        </main>
+      </div>
+    )
+  }
+
+  if (error || !opportunity) {
+    return (
+      <div className="min-h-screen bg-white">
+        <Header />
+        <main className="max-w-4xl mx-auto px-4 py-8">
+          <div className="text-center py-12">
+            <div className="text-red-600 mb-2">Error loading opportunity</div>
+            <p className="text-gray-600">{error || 'Opportunity not found'}</p>
+            <Link href="/community/volunteer" className="mt-4 inline-block text-blue-600 hover:underline">
+              Return to opportunities
+            </Link>
+          </div>
+        </main>
+      </div>
+    )
+  }
 
   const formatTimeAgo = (date: Date | any) => {
     if (!date) return 'Unknown'
@@ -59,43 +135,6 @@ export default function VolunteerOpportunityPage() {
     }
   }
 
-  const handleApply = () => {
-    if (opportunity?.contactEmail) {
-      const subject = `Volunteer Application: ${opportunity.title}`
-      const body = `Hello,\n\nI would like to volunteer for the "${opportunity.title}" opportunity.\n\nPlease let me know the next steps.\n\nThank you!`
-      window.location.href = `mailto:${opportunity.contactEmail}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
-      setHasApplied(true)
-    }
-  }
-
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-white">
-        <Header />
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="animate-pulse">Loading opportunity...</div>
-        </div>
-      </div>
-    )
-  }
-
-  if (!opportunity) {
-    return (
-      <div className="min-h-screen bg-white">
-        <Header />
-        <div className="max-w-4xl mx-auto px-4 py-8">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-gray-900 mb-4">Opportunity Not Found</h1>
-            <p className="text-gray-600 mb-6">The volunteer opportunity you're looking for doesn't exist or is no longer available.</p>
-            <Link href="/community/volunteer" className="text-blue-600 hover:underline">
-              ← Back to Volunteer Opportunities
-            </Link>
-          </div>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-white">
       <Header />
@@ -109,6 +148,15 @@ export default function VolunteerOpportunityPage() {
           <span className="mx-2">/</span>
           <span>{opportunity.title}</span>
         </nav>
+
+        {/* Status Message */}
+        {statusMessage && (
+          <div className={`mb-6 p-4 rounded-lg ${
+            registrationStatus === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+          }`}>
+            {statusMessage}
+          </div>
+        )}
 
         {/* Opportunity Details */}
         <article className="bg-white border border-gray-200 rounded-lg p-8 mb-8">
@@ -140,12 +188,26 @@ export default function VolunteerOpportunityPage() {
                 </div>
               </div>
               
-              <div className="text-right">
-                {opportunity.spotsTotal && (
-                  <div className="text-sm text-gray-500">
-                    {opportunity.spotsAvailable || 0} of {opportunity.spotsTotal} spots available
-                  </div>
+              <div className="flex items-center space-x-4">
+                {/* Show edit button if user is the creator or manages the organization */}
+                {user && (opportunity.createdBy === user.uid || opportunity.organizationId === user.profile?.organizationId) && (
+                  <Link
+                    href={`/community/volunteer/edit/${opportunity.id}`}
+                    className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    <svg className="h-4 w-4 mr-1.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                    </svg>
+                    Edit Opportunity
+                  </Link>
                 )}
+                <div className="text-right">
+                  {opportunity.spotsTotal && (
+                    <div className="text-sm text-gray-500">
+                      {opportunity.spotsAvailable || 0} of {opportunity.spotsTotal} spots available
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -256,117 +318,49 @@ export default function VolunteerOpportunityPage() {
             </div>
           )}
 
-          {/* Apply Section */}
+          {/* Registration Section */}
           <div className="border-t border-gray-200 pt-8">
             <div className="flex items-center justify-between">
               <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Ready to Make a Difference?</h3>
-                <p className="text-gray-600">
-                  Join our community of volunteers helping fight food insecurity.
+                <h2 className="text-xl font-semibold text-gray-900">Ready to Help?</h2>
+                <p className="text-gray-600 mt-1">
+                  {isRegistered
+                    ? 'You are registered for this opportunity'
+                    : 'Register now to make a difference in your community'}
                 </p>
               </div>
-              <div className="flex items-center space-x-4">
-                {!hasApplied ? (
-                  <>
-                    <button
-                      onClick={handleApply}
-                      className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Apply Now
-                    </button>
-                    <button className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
-                      <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                      </svg>
-                      Save
-                    </button>
-                  </>
-                ) : (
-                  <div className="text-green-600 font-medium">
-                    ✓ Application sent! They'll contact you soon.
-                  </div>
-                )}
-              </div>
+              
+              {registrationStatus === 'loading' ? (
+                <div className="animate-pulse flex items-center space-x-2">
+                  <div className="h-8 w-8 rounded-full border-2 border-gray-300 border-t-blue-600 animate-spin"></div>
+                  <span className="text-gray-500">Processing...</span>
+                </div>
+              ) : isRegistered ? (
+                <button
+                  onClick={handleCancelRegistration}
+                  className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Cancel Registration
+                </button>
+              ) : (
+                <button
+                  onClick={handleRegistration}
+                  disabled={!opportunity.spotsAvailable || opportunity.spotsAvailable <= 0}
+                  className={`inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
+                    opportunity.spotsAvailable && opportunity.spotsAvailable > 0
+                      ? 'bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500'
+                      : 'bg-gray-400 cursor-not-allowed'
+                  }`}
+                >
+                  {opportunity.spotsAvailable && opportunity.spotsAvailable > 0
+                    ? 'Register Now'
+                    : 'No Spots Available'}
+                </button>
+              )}
             </div>
           </div>
         </article>
-
-        {/* Related Opportunities */}
-        <div className="bg-gray-50 border border-gray-200 rounded-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-900 mb-4">More Opportunities</h2>
-          <div className="grid md:grid-cols-2 gap-4">
-            {opportunities
-              .filter(opp => opp.id !== opportunity.id && opp.organization === opportunity.organization)
-              .slice(0, 2)
-              .map((relatedOpp) => (
-                <Link 
-                  key={relatedOpp.id} 
-                  href={`/community/volunteer/${relatedOpp.id}`}
-                  className="block p-4 bg-white border border-gray-200 rounded-lg hover:shadow-md transition-shadow"
-                >
-                  <h3 className="font-medium text-gray-900 mb-2">{relatedOpp.title}</h3>
-                  <p className="text-sm text-gray-600 mb-2 line-clamp-2">{relatedOpp.description}</p>
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>{relatedOpp.timeCommitment}</span>
-                    <span className={`px-2 py-1 rounded-full ${getUrgencyColor(relatedOpp.urgency)}`}>
-                      {getUrgencyLabel(relatedOpp.urgency)}
-                    </span>
-                  </div>
-                </Link>
-              ))}
-          </div>
-          {opportunities.filter(opp => opp.id !== opportunity.id).length === 0 && (
-            <p className="text-gray-500 text-center py-4">No other opportunities available at this time.</p>
-          )}
-        </div>
       </main>
-
-      {/* Footer */}
-      <div className="border-t border-gray-200 bg-gray-50 mt-12">
-        <div className="max-w-7xl mx-auto px-4 py-6">
-          <div className="grid md:grid-cols-4 gap-6 text-sm">
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">about</h3>
-              <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">help & FAQ</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">safety tips</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">terms of use</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">providers</h3>
-              <ul className="space-y-1">
-                <li><Link href="/add-organization" className="text-blue-600 hover:underline">add your organization</Link></li>
-                <li><Link href="/update-listing" className="text-blue-600 hover:underline">update your listing</Link></li>
-                <li><Link href="/provider-resources" className="text-blue-600 hover:underline">provider resources</Link></li>
-                <li><Link href="/bulkposting" className="text-blue-600 hover:underline">bulk posting</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">community</h3>
-              <ul className="space-y-1">
-                <li><Link href="/community/volunteer" className="text-blue-600 hover:underline">volunteer opportunities</Link></li>
-                <li><a href="#" className="text-blue-600 hover:underline">donate to local organizations</a></li>
-                <li><Link href="/community/forums" className="text-blue-600 hover:underline">community forums</Link></li>
-                <li><Link href="/community/resources" className="text-blue-600 hover:underline">resource guides</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold text-gray-900 mb-2">contact</h3>
-              <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">report an issue</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">suggest improvements</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">partnership inquiries</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">feedback</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-6 pt-6 border-t border-gray-200 text-center text-xs text-gray-500">
-            <p>© 2025 feedfind.org - connecting communities with food assistance resources</p>
-          </div>
-        </div>
-      </div>
     </div>
   )
 } 

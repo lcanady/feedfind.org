@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { parseLocationQuery } from '../../lib/locationService'
 import { useLocationSearch } from '../../hooks/useLocationSearch'
 import type { LocationSearchResult } from '../../types/database'
@@ -93,70 +93,36 @@ const DynamicSearchResults: React.FC<DynamicSearchResultsProps> = ({
 }
 
 export const MainSearchForm: React.FC = () => {
-  const [query, setQuery] = useState('')
+  const searchParams = useSearchParams()
+  const [query, setQuery] = useState(searchParams.get('q') || '')
   const [showResults, setShowResults] = useState(false)
   const [filters, setFilters] = useState({
-    openNow: false,
-    within5Miles: false,
-    noRegistration: false
+    openNow: searchParams.get('status') === 'open',
+    within5Miles: searchParams.get('radius') === '5',
+    noRegistration: searchParams.get('no_registration') === 'true'
   })
   const router = useRouter()
   const searchRef = useRef<HTMLDivElement>(null)
   
   const { searchLocations, loading, results, clearResults } = useLocationSearch()
 
-  // Debounced search function
-  const debouncedSearch = useCallback(
-    debounce(async (searchQuery: string) => {
-      if (searchQuery.trim().length < 2) {
-        clearResults()
-        setShowResults(false)
-        return
+  // Execute initial search if query exists
+  useEffect(() => {
+    if (query) {
+      const searchQuery = {
+        type: 'address' as const,
+        value: query
       }
-
-      const parsedQuery = parseLocationQuery(searchQuery.trim())
       
-      if (parsedQuery.type === 'invalid') {
-        // Still try to search, but might not get good results
-        console.warn('Invalid query:', parsedQuery.error)
-      }
-
-      // Convert parsed query to search format
-      let searchQueryObj
-      if (parsedQuery.type === 'zipcode' && parsedQuery.value) {
-        searchQueryObj = { type: 'zipcode' as const, value: parsedQuery.value as string }
-      } else if (parsedQuery.type === 'coordinates' && parsedQuery.value) {
-        // Convert LatLng to Coordinates
-        const latLng = parsedQuery.value as { lat: number; lng: number }
-        const coordinates = { latitude: latLng.lat, longitude: latLng.lng }
-        searchQueryObj = { type: 'coordinates' as const, value: coordinates }
-      } else {
-        // Treat as address search for now
-        searchQueryObj = { type: 'address' as const, value: searchQuery.trim() }
-      }
-
-      // Apply filters
       const searchFilters = {
         radius: filters.within5Miles ? 5 : 15,
         ...(filters.openNow && { currentStatus: ['open'] }),
+        ...(searchParams.get('type') && { serviceTypes: [searchParams.get('type')!] })
       }
-
-      try {
-        console.log('Executing search with:', searchQueryObj, searchFilters)
-        await searchLocations(searchQueryObj, searchFilters)
-        setShowResults(true)
-      } catch (error) {
-        console.error('Search error:', error)
-        setShowResults(false)
-      }
-    }, 300),
-    [searchLocations, filters, clearResults]
-  )
-
-  // Handle input change with debounced search
-  useEffect(() => {
-    debouncedSearch(query)
-  }, [query, debouncedSearch])
+      
+      searchLocations(searchQuery, searchFilters)
+    }
+  }, []) // Run once on mount
 
   // Handle clicking outside to close results
   useEffect(() => {

@@ -111,7 +111,10 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
         case 'address':
           console.log('Searching by address/text:', query.value)
           // Try text search first for address queries
-          searchResults = await locationService.current.searchByText(query.value as string)
+          searchResults = await locationService.current.searchByText(
+            query.value as string,
+            { serviceTypes: filters.serviceTypes }
+          )
           
           // If no results from text search, try geocoding (placeholder for now)
           if (searchResults.length === 0) {

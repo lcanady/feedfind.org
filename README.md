@@ -65,33 +65,80 @@ A real-time food assistance directory platform built with Test-Driven Developmen
 
 The platform includes non-obtrusive Google AdSense integration following Craigslist-style design principles:
 
-### Ad Placements
-- **Header Ad**: Small horizontal banner below the main header
-- **Sidebar Ad**: Rectangle ad in the left sidebar after category links
-- **Footer Ad**: Horizontal banner above the footer links
+### Initial Setup for feedfind.org
 
-### Configuration
-1. Get your Google AdSense client ID from [Google AdSense](https://www.google.com/adsense/)
-2. Add your client ID to the environment variables:
+1. **Get AdSense Approval**:
+   - Visit [Google AdSense](https://www.google.com/adsense)
+   - Sign up with your feedfind.org domain
+   - Add the site for review
+   - Wait for domain verification and approval
+
+2. **Domain Verification**:
+   - The layout already includes the necessary meta tags for verification
+   - The verification will use your AdSense client ID automatically
+   - Make sure your domain DNS is properly configured
+
+3. **Environment Configuration**:
    ```bash
-   NEXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-your-client-id
+   # .env.local or deployment environment
+   NEXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-your-actual-client-id
    ```
-3. Update the ad slot IDs in `/components/ui/AdSense.tsx` with your actual ad slots
 
-### Ad Slot Setup
-Replace the placeholder ad slots in `components/ui/AdSense.tsx`:
-```typescript
-// Replace these with your actual ad slot IDs
-HeaderAd: adSlot="1234567890"
-SidebarAd: adSlot="1234567891"  
-FooterAd: adSlot="1234567892"
-```
+### Ad Placements & Slots
 
-### Features
-- **Responsive**: Ads automatically adjust to different screen sizes
-- **Accessible**: Ads are hidden during print and marked as advertisements
-- **Performance**: Ads load asynchronously after page content
-- **Non-Obtrusive**: Styled to match the overall site design
+The platform has pre-configured ad slots for optimal placement:
+
+#### Main Page Ads
+- **Header Banner**: Above the main content (728x90)
+  ```typescript
+  adSlot="your-header-slot-id"
+  ```
+- **Sidebar Rectangle**: Right sidebar (300x250)
+  ```typescript
+  adSlot="your-sidebar-slot-id"
+  ```
+- **Footer Banner**: Below main content (728x90)
+  ```typescript
+  adSlot="your-footer-slot-id"
+  ```
+
+#### Community Section Ads
+- **Forum Post Ad**: Between forum posts (728x90)
+- **Forum Sidebar**: Right sidebar (300x250)
+- **Forum Reply**: Between replies (300x250)
+- **Forum Footer**: Bottom of forum pages (728x90)
+
+### Ad Component Features
+- **Responsive**: Automatically adjusts to screen size
+- **User Preferences**: Respects ad-free subscriptions
+- **Accessibility**: WCAG 2.1 AA compliant
+- **Performance**: Async loading after core content
+- **Error Handling**: Graceful fallbacks for ad blockers
+- **Print-Friendly**: Ads hidden during printing
+
+### Ad-Free Experience
+The platform supports an ad-free subscription model:
+- Users can upgrade to remove ads
+- Premium subscribers automatically get ad-free experience
+- Ad preferences managed in user profile settings
+
+### Testing Ads
+1. **Development**:
+   ```bash
+   # Use test ad units in development
+   NEXT_PUBLIC_ADSENSE_CLIENT_ID=ca-pub-test-id
+   ```
+
+2. **Production**:
+   - Replace all test ad slots with actual slots from AdSense dashboard
+   - Monitor ad performance in AdSense analytics
+   - Test across different devices and screen sizes
+
+### Best Practices
+- Keep ads non-intrusive and clearly marked
+- Maintain content-to-ad ratio per Google policies
+- Regular monitoring of ad performance
+- Respect user preferences for ad personalization
 
 ## Authentication System
 

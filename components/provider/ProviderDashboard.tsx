@@ -5,6 +5,7 @@ import { ProviderService, LocationService, StatusUpdateService } from '../../lib
 import { useAuth } from '../../hooks/useAuth'
 import type { Provider, Location, StatusUpdate, CurrentLocationStatus } from '../../types/database'
 import { ProviderRegistrationForm } from './ProviderRegistrationForm'
+import { VolunteerManagement } from './VolunteerManagement'
 
 export interface ProviderDashboardProps {
   providerId: string
@@ -62,7 +63,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'analytics'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'analytics' | 'volunteers'>('overview')
   const [statusUpdateForm, setStatusUpdateForm] = useState({
     status: '' as CurrentLocationStatus | '',
     notes: '',
@@ -557,31 +558,53 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         </div>
       )}
 
-      {/* Tab Navigation */}
+      {/* Tabs */}
       <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8" aria-label="Dashboard tabs">
-          {[
-            { id: 'overview', label: 'Overview' },
-            { id: 'locations', label: 'Locations' },
-            { id: 'analytics', label: 'Analytics' }
-          ].map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id as any)}
-              className={`py-2 px-1 border-b-2 font-medium text-sm ${
-                activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-              }`}
-              aria-current={activeTab === tab.id ? 'page' : undefined}
-            >
-              {tab.label}
-            </button>
-          ))}
+        <nav className="-mb-px flex space-x-8">
+          <button
+            onClick={() => setActiveTab('overview')}
+            className={`${
+              activeTab === 'overview'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Overview
+          </button>
+          <button
+            onClick={() => setActiveTab('locations')}
+            className={`${
+              activeTab === 'locations'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Locations
+          </button>
+          <button
+            onClick={() => setActiveTab('volunteers')}
+            className={`${
+              activeTab === 'volunteers'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Volunteer Management
+          </button>
+          <button
+            onClick={() => setActiveTab('analytics')}
+            className={`${
+              activeTab === 'analytics'
+                ? 'border-blue-500 text-blue-600'
+                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+          >
+            Analytics
+          </button>
         </nav>
       </div>
 
-      {/* Overview Tab */}
+      {/* Tab Content */}
       {activeTab === 'overview' && (
         <div>
           {/* Statistics Cards */}
@@ -649,7 +672,6 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         </div>
       )}
 
-      {/* Locations Tab */}
       {activeTab === 'locations' && (
         <div>
           {/* Bulk Actions */}
@@ -733,7 +755,10 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         </div>
       )}
 
-      {/* Analytics Tab */}
+      {activeTab === 'volunteers' && (
+        <VolunteerManagement providerId={providerId} />
+      )}
+
       {activeTab === 'analytics' && (
         <div>
           {data.analytics ? (

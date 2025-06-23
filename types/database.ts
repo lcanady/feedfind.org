@@ -1,10 +1,11 @@
 import { Timestamp } from 'firebase/firestore'
 
-// Base interface for documents with metadata
+// Base Types
 export interface BaseDocument {
   id: string
   createdAt: Timestamp | Date
-  updatedAt?: Timestamp | Date
+  updatedAt: Timestamp | Date
+  status: 'active' | 'inactive' | 'deleted'
 }
 
 // User role types
@@ -530,7 +531,6 @@ export interface VolunteerOpportunity extends BaseDocument {
   applicationUrl?: string
   
   // Status and categorization
-  status: 'active' | 'filled' | 'expired' | 'cancelled'
   urgency: 'low' | 'normal' | 'high' | 'urgent'
   category: 'food_distribution' | 'kitchen_help' | 'delivery' | 'events' | 'admin' | 'other'
   
@@ -539,6 +539,15 @@ export interface VolunteerOpportunity extends BaseDocument {
   verifiedBy?: string
   createdBy: string
   tags?: string[]
+
+  // Registrations
+  registrations?: {
+    [userId: string]: {
+      registeredAt: Timestamp | Date
+      status: 'pending' | 'approved' | 'declined'
+      notes?: string
+    }
+  }
 }
 
 export interface CommunityEvent extends BaseDocument {
@@ -547,96 +556,60 @@ export interface CommunityEvent extends BaseDocument {
   organization: string
   organizationId?: string
   
-  // Event details
-  date: Timestamp | Date
-  startTime: string
-  endTime: string
-  timezone?: string
-  
   // Location
   location: string
-  address: string
+  address?: string
   coordinates?: Coordinates
   isVirtual?: boolean
-  virtualLink?: string
   
-  // Event type and categorization
-  type: 'distribution' | 'meal' | 'workshop' | 'fundraiser' | 'community' | 'educational'
-  category: string
-  tags?: string[]
+  // Timing
+  startDate: Timestamp | Date
+  endDate: Timestamp | Date
+  timezone: string
   
-  // Capacity and registration
+  // Details
+  type: 'workshop' | 'distribution' | 'fundraiser' | 'other'
   capacity?: number
-  registered?: number
-  registrationRequired?: boolean
+  registrationRequired: boolean
   registrationUrl?: string
-  isWaitlistEnabled?: boolean
-  
-  // Requirements
-  requirements?: string[]
-  ageRestriction?: string
-  costInfo?: string
-  materialsNeeded?: string[]
+  cost?: number
   
   // Contact
   contactEmail: string
   contactPhone?: string
   
-  // Status
-  status: 'upcoming' | 'today' | 'ongoing' | 'completed' | 'cancelled'
-  isRecurring?: boolean
-  recurrencePattern?: string
-  
   // Meta
   isVerified?: boolean
   verifiedBy?: string
   createdBy: string
-  featuredImage?: string
+  tags?: string[]
 }
 
 export interface CommunityResource extends BaseDocument {
   title: string
   description: string
-  category: 'government' | 'local' | 'transportation' | 'family' | 'national' | 'housing' | 'healthcare' | 'education'
-  type: 'guide' | 'website' | 'document' | 'video' | 'contact'
+  organization: string
+  organizationId?: string
   
   // Content
-  content?: string
-  url?: string
-  downloadUrl?: string
-  phoneNumber?: string
+  content: string
+  contentType: 'article' | 'guide' | 'video' | 'link'
+  externalUrl?: string
   
-  // Metadata
+  // Categorization
+  category: 'food_assistance' | 'nutrition' | 'cooking' | 'budgeting' | 'other'
   tags?: string[]
-  language?: string
-  targetAudience?: string[]
-  difficulty?: 'beginner' | 'intermediate' | 'advanced'
   
-  // Engagement
-  views: number
-  likes: number
-  downloads?: number
-  shares?: number
-  
-  // Author and verification
+  // Meta
+  author: string
   authorId: string
-  authorName: string
   isVerified?: boolean
   verifiedBy?: string
-  source?: string
-  lastUpdated?: Timestamp | Date
   
-  // Moderation
-  isModerated?: boolean
-  status: 'active' | 'hidden' | 'deleted'
-  moderatedBy?: string
-  moderatedAt?: Timestamp | Date
-  reportCount?: number
-  
-  // Location relevance
-  isLocationSpecific?: boolean
-  applicableZipCodes?: string[]
-  applicableStates?: string[]
+  // Stats
+  views: number
+  likes: number
+  shares: number
 }
 
 export interface CommunityEngagement extends BaseDocument {
@@ -694,11 +667,11 @@ export type UpdateForumPostData = Partial<Omit<ForumPost, 'id' | 'createdAt' | '
 export type CreateForumReplyData = Omit<ForumReply, 'id' | 'createdAt' | 'updatedAt' | 'likes'>
 export type UpdateForumReplyData = Partial<Omit<ForumReply, 'id' | 'createdAt' | 'authorId' | 'postId'>>
 
-export type CreateVolunteerOpportunityData = Omit<VolunteerOpportunity, 'id' | 'createdAt' | 'updatedAt'>
-export type UpdateVolunteerOpportunityData = Partial<Omit<VolunteerOpportunity, 'id' | 'createdAt'>>
+export type CreateVolunteerOpportunityData = Omit<VolunteerOpportunity, keyof BaseDocument | 'registrations' | 'spotsRegistered' | 'spotsAvailable'>
+export type UpdateVolunteerOpportunityData = Partial<Omit<VolunteerOpportunity, keyof BaseDocument | 'registrations' | 'spotsRegistered'>>
 
-export type CreateCommunityEventData = Omit<CommunityEvent, 'id' | 'createdAt' | 'updatedAt'>
+export type CreateCommunityEventData = Omit<CommunityEvent, keyof BaseDocument>
 export type UpdateCommunityEventData = Partial<Omit<CommunityEvent, 'id' | 'createdAt'>>
 
-export type CreateCommunityResourceData = Omit<CommunityResource, 'id' | 'createdAt' | 'updatedAt' | 'views' | 'likes'>
+export type CreateCommunityResourceData = Omit<CommunityResource, keyof BaseDocument | 'views' | 'likes' | 'shares'>
 export type UpdateCommunityResourceData = Partial<Omit<CommunityResource, 'id' | 'createdAt' | 'authorId'>> 

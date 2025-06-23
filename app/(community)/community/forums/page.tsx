@@ -229,122 +229,72 @@ export default function CommunityForumsPage() {
 
               <div className="divide-y divide-gray-200">
                 {loading ? (
-                  <>
-                    {/* Standard Loading Spinner */}
-                    <div className="p-8 text-center">
-                      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                      <p className="text-gray-600">Loading forum posts...</p>
-                    </div>
-                    {/* Skeleton Loading */}
-                    {Array.from({ length: 5 }).map((_, i) => (
-                      <div key={i} className="p-6 animate-pulse">
-                        <div className="flex items-start justify-between">
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2 mb-2">
-                              <div className="h-4 bg-gray-200 rounded w-16"></div>
-                              <div className="h-4 bg-gray-200 rounded w-12"></div>
-                            </div>
-                            <div className="h-6 bg-gray-200 rounded w-3/4 mb-2"></div>
-                            <div className="flex items-center space-x-4">
-                              <div className="h-4 bg-gray-200 rounded w-20"></div>
-                              <div className="h-4 bg-gray-200 rounded w-16"></div>
-                              <div className="h-4 bg-gray-200 rounded w-24"></div>
-                            </div>
-                          </div>
-                          <div className="ml-4 w-10 h-10 bg-gray-200 rounded-full"></div>
-                        </div>
-                      </div>
-                    ))}
-                  </>
+                  <div className="text-center py-12">
+                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
+                    <p className="mt-4 text-gray-600">Loading forum posts...</p>
+                  </div>
                 ) : error ? (
-                  // Error state
-                  <div className="p-12 text-center">
-                    <div className="text-red-500 mb-4">
-                      <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">Unable to load posts</h3>
-                    <p className="text-gray-600 mb-4">{error}</p>
-                    <button
-                      onClick={() => window.location.reload()}
-                      className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
-                    >
-                      Try again
-                    </button>
+                  <div className="text-center py-12">
+                    <div className="text-red-600 mb-2">Error loading forum posts</div>
+                    <p className="text-gray-600">{error}</p>
                   </div>
                 ) : filteredPosts.length === 0 ? (
-                  // Empty state
-                  <div className="p-12 text-center">
-                    <div className="text-gray-400 mb-4">
-                      <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-lg font-medium text-gray-900 mb-2">No posts yet</h3>
-                    <p className="text-gray-600 mb-4">
-                      {selectedCategory === 'all' 
-                        ? "Be the first to start a discussion in this community!" 
-                        : `No posts in the ${getCategoryDisplayName(selectedCategory)} category yet.`
-                      }
-                    </p>
-                    <button className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700">
-                      Start a discussion
-                    </button>
+                  <div className="text-center py-12">
+                    <p className="text-gray-600">No posts found in this category.</p>
+                    <Link href="/community/forums/new" className="mt-4 inline-block text-blue-600 hover:underline">
+                      Create the first post
+                    </Link>
                   </div>
                 ) : (
-                  // Posts list
-                  filteredPosts.map((post) => (
-                  <div key={post.id} className="p-6 hover:bg-gray-50 transition-colors">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center space-x-2 mb-2">
-                          {post.isPinned && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2.586l-1.707 1.707A1 1 0 006.586 12H8v6a1 1 0 001 1h2a1 1 0 001-1v-6h1.414a1 1 0 00.707-1.707L12.414 9H15a2 2 0 002-2V5a2 2 0 00-2-2H5z" />
+                  <div className="space-y-6">
+                    {filteredPosts.map((post) => (
+                      <article key={post.id} className="bg-white border border-gray-200 rounded-lg p-6">
+                        <div className="flex items-center justify-between mb-4">
+                          <div>
+                            <Link href={`/community/forums/${post.id}`} className="text-xl font-semibold text-gray-900 hover:text-blue-600">
+                              {post.title}
+                            </Link>
+                            <div className="text-sm text-gray-500 mt-1">
+                              Posted by {post.authorName} • {formatTimeAgo(post.createdAt instanceof Date ? post.createdAt : post.createdAt.toDate())}
+                            </div>
+                          </div>
+                          <div className="text-sm text-gray-500">
+                            <span className="inline-flex items-center mr-4">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                               </svg>
-                              Pinned
+                              {post.replies} replies
                             </span>
-                          )}
-                          {post.isLocked && (
-                            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
-                              <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
-                                <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                            <span className="inline-flex items-center">
+                              <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                               </svg>
-                              Locked
+                              {post.views} views
                             </span>
-                          )}
-                                                      <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-gray-100 text-gray-800">
-                            {getCategoryDisplayName(post.category)}
-                          </span>
+                          </div>
                         </div>
-                        
-                        <Link href={`/community/forums/${post.id}`}>
-                          <h3 className="text-lg font-medium text-gray-900 mb-2 hover:text-blue-600 cursor-pointer">
-                            {post.title}
-                          </h3>
-                        </Link>
-                        
-                        <div className="flex items-center text-sm text-gray-500 space-x-4">
-                          <span>by {post.authorName}</span>
-                          <span>•</span>
-                                                      <span>{post.replies || 0} replies</span>
-                          <span>•</span>
-                          <span>Last activity {post.lastActivity ? formatTimeAgo(post.lastActivity instanceof Date ? post.lastActivity : post.lastActivity.toDate()) : 'Unknown'}</span>
+                        <p className="text-gray-600 line-clamp-2">{post.content}</p>
+                        <div className="mt-4 flex items-center justify-between">
+                          <div className="flex items-center space-x-2">
+                            <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                              post.category === selectedCategory ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-700'
+                            }`}>
+                              {getCategoryDisplayName(post.category)}
+                            </span>
+                            {post.tags?.map((tag) => (
+                              <span key={tag} className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-700">
+                                {tag}
+                              </span>
+                            ))}
+                          </div>
+                          <Link href={`/community/forums/${post.id}`} className="text-sm text-blue-600 hover:text-blue-800">
+                            Read more →
+                          </Link>
                         </div>
-                      </div>
-                      
-                      <div className="ml-4 flex-shrink-0">
-                        <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                          <span className="text-sm font-medium text-gray-600">
-                            {post.authorName.split(' ').map((n: string) => n[0]).join('').toUpperCase()}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
+                      </article>
+                    ))}
                   </div>
-                  ))
                 )}
               </div>
 
