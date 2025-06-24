@@ -150,7 +150,7 @@ export const LocationMap: React.FC<LocationMapProps> = ({
   const [isMapLoaded, setIsMapLoaded] = useState(false)
   
   // Use Google Maps hook
-  const { isLoaded: isGoogleMapsAvailable, isLoading: isMapsLoading, error: mapsLoadError, reload: reloadMaps } = useGoogleMaps({
+  const { isLoaded: isGoogleMapsAvailable, isLoading: isMapsLoading, error: mapsLoadError } = useGoogleMaps({
     libraries: ['marker']
   })
 
@@ -331,108 +331,54 @@ export const LocationMap: React.FC<LocationMapProps> = ({
     setShowListView(!showListView)
   }
 
-  // Render loading state
-  if (isMapsLoading) {
-    return (
-      <div className={`${className} flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg`} style={{ height }}>
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Loading Google Maps...</p>
-        </div>
+  // Loading indicator component
+  const LoadingIndicator = () => (
+    <div className="absolute inset-0 flex items-center justify-center bg-gray-50 bg-opacity-75">
+      <div className="flex flex-col items-center space-y-2">
+        <div className="w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <span className="text-sm text-gray-600">Loading map...</span>
       </div>
-    )
-  }
+    </div>
+  )
 
-  // Render error state
-  if (mapError) {
-    return (
-      <div className={`${className}`} style={{ height }}>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6 text-center">
-          <div className="text-red-600 mb-4">
-            <svg className="w-12 h-12 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.35 18.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-          </div>
-          <h3 className="text-lg font-semibold text-red-800 mb-2">Map could not be loaded</h3>
-          <p className="text-red-600 mb-4">{mapError}</p>
-          <p className="text-sm text-red-500">Please try refreshing the page or check your internet connection.</p>
-        </div>
-        
-        {/* Fallback list view */}
-        <div className="mt-6">
-          <LocationListFallback locations={locations} onLocationSelect={onLocationSelect} />
-        </div>
-      </div>
-    )
-  }
-
-  // Render no locations state
-  if (locations.length === 0) {
-    return (
-      <div className={`${className} flex items-center justify-center bg-gray-50 border border-gray-200 rounded-lg`} style={{ height }}>
-        <div className="text-center text-gray-500">
-          <svg className="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
-          </svg>
-          <p className="text-lg font-medium">No locations to display</p>
-          <p className="text-sm">Try adjusting your search criteria</p>
-        </div>
-      </div>
-    )
-  }
-
-  return (
-    <div className={`relative ${className}`} style={{ height }}>
-      {/* Accessibility instructions */}
-      <div className="sr-only">
-        <p>Interactive map showing food assistance locations. Use arrow keys to navigate and Enter to select markers.</p>
-        <p>For keyboard navigation, use the list view toggle below.</p>
-      </div>
-
-      {/* Map controls */}
-      <div className="absolute top-4 right-4 z-10 flex flex-col gap-2">
-        <button
-          onClick={toggleView}
-          className="bg-white border border-gray-300 rounded-lg px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 shadow-sm"
-          aria-label={showListView ? 'Switch to map view' : 'Switch to list view'}
+  // Error display component
+  const ErrorDisplay = ({ message }: { message: string }) => (
+    <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+      <div className="max-w-md p-4 text-center">
+        <p className="text-red-600 mb-2">{message}</p>
+        <button 
+          onClick={() => window.location.reload()}
+          className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 transition-colors"
         >
-          {showListView ? (
-            <>
-              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-1.447-.894L15 4m0 13V4m0 0L9 7" />
-              </svg>
-              Map View
-            </>
-          ) : (
-            <>
-              <svg className="w-4 h-4 inline mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" />
-              </svg>
-              List View
-            </>
-          )}
+          Retry
         </button>
       </div>
+    </div>
+  )
 
-      {/* Map container */}
-      {!showListView && (
-        <div
-          ref={mapRef}
-          className="w-full h-full rounded-lg"
-          role="application"
-          aria-label="Interactive map showing food assistance locations"
-        />
+  return (
+    <div 
+      className={`relative ${className}`} 
+      style={{ height: height || '400px', minHeight: '250px' }}
+    >
+      <div 
+        ref={mapRef}
+        className="absolute inset-0 rounded-lg overflow-hidden"
+        style={{ opacity: isMapLoaded ? 1 : 0.4, transition: 'opacity 0.3s' }}
+      />
+      
+      {isMapsLoading && <LoadingIndicator />}
+      
+      {(mapError || mapsLoadError) && (
+        <ErrorDisplay message={mapError || mapsLoadError || 'Failed to load map'} />
       )}
-
-      {/* List view */}
-      {showListView && (
-        <div 
-          className="w-full h-full overflow-y-auto bg-white rounded-lg border border-gray-200"
-          role="region"
-          aria-label="Map alternative - list of food assistance locations"
-        >
-          <LocationListFallback locations={locations} onLocationSelect={onLocationSelect} />
+      
+      {!isGoogleMapsAvailable && !isMapsLoading && !mapError && (
+        <div className="absolute inset-0 flex items-center justify-center bg-gray-50">
+          <LocationListFallback 
+            locations={locations} 
+            onLocationSelect={onLocationSelect} 
+          />
         </div>
       )}
     </div>

@@ -438,28 +438,54 @@ export class LocationService extends DatabaseService {
     coordinates: Coordinates,
     radiusKm: number
   ): Promise<Array<Location & { distance: number }>> {
-    // Get all active locations (in real implementation, use geohash or similar)
-    const results = await this.list('locations', {
-      where: [{ field: 'status', operator: '==', value: 'active' }]
-    })
+    try {
+      // Convert radius from km to miles since calculateDistance returns miles
+      const radiusMiles = radiusKm * 0.621371;
 
-    const locationsWithDistance = results.docs
-      .map(doc => {
-        const docData = doc.data()
-        const distance = calculateDistance(
-          coordinatesToLatLng(coordinates),
-          coordinatesToLatLng(docData.coordinates)
-        )
-        return {
-          id: doc.id,
-          ...docData,
-          distance
-        }
-      })
-      .filter(location => location.distance <= radiusKm)
-      .sort((a, b) => a.distance - b.distance)
+      // Get all locations (not just active ones for now)
+      const results = await this.list('locations', {
+        where: [] // Remove active-only filter temporarily for debugging
+      });
 
-    return locationsWithDistance as Array<Location & { distance: number }>
+      if (results.docs.length === 0) {
+        console.log('No locations found in database');
+        return [];
+      }
+
+      console.log(`Found ${results.docs.length} total locations`);
+
+      const locationsWithDistance = results.docs
+        .map(doc => {
+          const docData = doc.data();
+          const distance = calculateDistance(
+            coordinatesToLatLng(coordinates),
+            coordinatesToLatLng(docData.coordinates)
+          );
+
+          // Log each location's distance for debugging
+          console.log(`Location ${docData.name}: ${distance.toFixed(2)} miles from search point`);
+
+          return {
+            id: doc.id,
+            ...docData,
+            distance
+          };
+        })
+        .filter(location => {
+          const withinRadius = location.distance <= radiusMiles;
+          if (!withinRadius) {
+            console.log(`Location ${location.name} filtered out: ${location.distance.toFixed(2)} miles > ${radiusMiles.toFixed(2)} miles radius`);
+          }
+          return withinRadius;
+        })
+        .sort((a, b) => a.distance - b.distance);
+
+      console.log(`Returning ${locationsWithDistance.length} locations within ${radiusMiles.toFixed(2)} miles`);
+      return locationsWithDistance as Array<Location & { distance: number }>;
+    } catch (error) {
+      console.error('Error in searchByCoordinates:', error);
+      throw error;
+    }
   }
 
   async searchByZipCode(zipCode: string): Promise<Location[]> {

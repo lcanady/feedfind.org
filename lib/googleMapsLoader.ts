@@ -47,13 +47,12 @@ export const loadGoogleMaps = async (options: GoogleMapsLoaderOptions): Promise<
     // Create script element
     const script = document.createElement('script')
     script.type = 'text/javascript'
-    script.async = true
-    script.defer = true
 
     // Build URL with parameters
     const params = new URLSearchParams({
       key: options.apiKey,
       libraries: (options.libraries || ['marker']).join(','),
+      loading: 'async',
       callback: 'initGoogleMaps'
     })
 

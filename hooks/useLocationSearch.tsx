@@ -91,7 +91,6 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
           console.log('Searching by ZIP code:', query.value)
           searchResults = await locationService.current.searchByZipCode(query.value as string)
           // For ZIP code searches, we might need to geocode to get center point
-          // This is a simplified implementation - in reality you'd use Google Geocoding API
           searchCenter = await geocodeZipCode(query.value as string)
           break
 
@@ -99,13 +98,25 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
           console.log('Searching by coordinates:', query.value)
           const coords = query.value as Coordinates
           searchCenter = coords
-          const radius = filters.radius || 10 // Default 10km radius
-          const locationsWithDistance = await locationService.current.searchByCoordinates(coords, radius)
-          // Extract locations from the distance results
-          searchResults = locationsWithDistance.map(item => ({
-            ...item,
-            distance: undefined // Remove distance as we'll recalculate consistently
-          })) as Location[]
+          const radius = filters.radius || 25 // Default 25 mile radius (40km)
+          // Convert radius to kilometers for the database service
+          const radiusKm = radius * 1.60934
+          try {
+            const locationsWithDistance = await locationService.current.searchByCoordinates(coords, radiusKm)
+            // Extract locations from the distance results
+            searchResults = locationsWithDistance.map(item => ({
+              ...item,
+              distance: undefined // Remove distance as we'll recalculate consistently
+            })) as Location[]
+            
+            if (searchResults.length === 0) {
+              console.log(`No locations found within ${radius} miles of coordinates:`, coords)
+              setError(`No locations found within ${radius} miles of your location. Try increasing the search radius or searching in a different area.`)
+            }
+          } catch (error) {
+            console.error('Error searching by coordinates:', error)
+            throw new Error('Failed to search by coordinates. Please try again or use a different search method.')
+          }
           break
 
         case 'address':
@@ -142,15 +153,19 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
 
       // Apply additional filters
       if (filters.status && filters.status.length > 0) {
+        const beforeFilter = searchResults.length
         searchResults = searchResults.filter(location => 
           filters.status!.includes(location.status)
         )
+        console.log(`Status filter removed ${beforeFilter - searchResults.length} locations`)
       }
 
       if (filters.currentStatus && filters.currentStatus.length > 0) {
+        const beforeFilter = searchResults.length
         searchResults = searchResults.filter(location => 
           location.currentStatus && filters.currentStatus!.includes(location.currentStatus)
         )
+        console.log(`Current status filter removed ${beforeFilter - searchResults.length} locations`)
       }
 
       // Calculate distances if we have a search center
@@ -161,8 +176,8 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
 
         return {
           location,
-          provider: { id: location.providerId } as any, // Will be populated in real implementation
-          services: [], // Will be populated in real implementation
+          provider: { id: location.providerId } as any,
+          services: [],
           distance,
           currentStatus: location.currentStatus,
           lastUpdated: location.lastStatusUpdate,
@@ -180,7 +195,7 @@ export const useLocationSearch = (): UseLocationSearchReturn => {
       })
 
       setResults(resultsWithDistance)
-      setHasMore(resultsWithDistance.length >= 20) // Assume more results if we got 20+
+      setHasMore(resultsWithDistance.length >= 20)
       
     } catch (err: any) {
       if (err.name === 'AbortError') {

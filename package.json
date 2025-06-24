@@ -25,6 +25,7 @@
   "license": "MIT",
   "dependencies": {
     "@firebase/rules-unit-testing": "^4.0.1",
+    "@googlemaps/js-api-loader": "^1.16.8",
     "@googlemaps/markerclusterer": "^2.5.3",
     "@types/google.maps": "^3.58.1",
     "@types/node": "^22.10.5",
