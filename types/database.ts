@@ -590,37 +590,44 @@ export interface CommunityEvent extends BaseDocument {
   eventStatus?: 'upcoming' | 'ongoing' | 'completed' | 'cancelled'
 }
 
-export interface CommunityResource extends BaseDocument {
+export type CommunityResourceCategory = 
+  | 'government' 
+  | 'local' 
+  | 'transportation' 
+  | 'family' 
+  | 'national' 
+  | 'housing' 
+  | 'healthcare' 
+  | 'education'
+
+export type CommunityResourceType = 
+  | 'guide'
+  | 'website'
+  | 'document'
+  | 'video'
+  | 'contact'
+
+export interface CommunityResource {
+  id: string
   title: string
   description: string
-  organization: string
-  organizationId?: string
-  
-  // Content
-  content: string
-  contentType: 'article' | 'guide' | 'video' | 'link'
-  externalUrl?: string
-  
-  // Categorization
-  category: 'food_assistance' | 'nutrition' | 'cooking' | 'budgeting' | 'other'
-  tags?: string[]
-  
-  // Meta
-  author: string
+  category: CommunityResourceCategory
+  type: CommunityResourceType
   authorId: string
-  isVerified?: boolean
-  verifiedBy?: string
-  
-  // Stats
+  authorName: string
+  createdAt: Date | Timestamp
+  updatedAt: Date | Timestamp
+  status: 'active' | 'inactive' | 'deleted'
   views: number
   likes: number
   shares: number
-  
-  // Engagement
-  likedBy?: {
-    [userId: string]: Timestamp | Date
-  }
+  tags?: string[]
+  externalUrl?: string
+  phoneNumber?: string
+  likedBy?: Record<string, boolean>
 }
+
+export type CreateCommunityResourceData = Omit<CommunityResource, 'id' | 'createdAt' | 'updatedAt' | 'views' | 'likes' | 'shares' | 'status'>
 
 export interface CommunityEngagement extends BaseDocument {
   userId: string
@@ -683,5 +690,4 @@ export type UpdateVolunteerOpportunityData = Partial<Omit<VolunteerOpportunity, 
 export type CreateCommunityEventData = Omit<CommunityEvent, keyof BaseDocument>
 export type UpdateCommunityEventData = Partial<Omit<CommunityEvent, 'id' | 'createdAt'>>
 
-export type CreateCommunityResourceData = Omit<CommunityResource, keyof BaseDocument | 'views' | 'likes' | 'shares'>
 export type UpdateCommunityResourceData = Partial<Omit<CommunityResource, 'id' | 'createdAt' | 'authorId'>> 

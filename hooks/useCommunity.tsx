@@ -126,58 +126,207 @@ export function useCommunityEvents() {
 }
 
 // Community Resources Hook
-export function useCommunityResources(filter?: string) {
+export function useCommunityResources(category?: string) {
   const [resources, setResources] = useState<CommunityResource[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { user } = useAuth()
 
+  // Fetch resources
   useEffect(() => {
-    setLoading(true)
-    setError(null)
-
-    const unsubscribe = communityResourcesService.subscribeToResources((updatedResources) => {
-      setResources(updatedResources)
-      setLoading(false)
-    }, filter)
-
-    return () => unsubscribe()
-  }, [filter])
-
-  const likeResource = useCallback(async (resourceId: string) => {
-    if (!user) throw new Error('Must be logged in to like resources')
-    try {
-      await communityResourcesService.toggleLike(resourceId, user.uid)
-    } catch (error) {
-      console.error('Error liking resource:', error)
-      throw error
+    const fetchResources = async () => {
+      try {
+        setLoading(true)
+        const data = await communityResourcesService.getResources()
+        setResources(data)
+        setError(null)
+      } catch (err) {
+        setError('Failed to fetch resources')
+        console.error('Error fetching resources:', err)
+      } finally {
+        setLoading(false)
+      }
     }
-  }, [user])
 
+    fetchResources()
+  }, [])
+
+  // Like a resource
+  const likeResource = useCallback(async (resourceId: string, userId: string) => {
+    try {
+      await communityResourcesService.likeResource(resourceId, userId)
+      // Optimistically update the UI
+      setResources(prev => prev.map(resource => {
+        if (resource.id === resourceId) {
+          return {
+            ...resource,
+            likes: resource.likes + 1,
+            likedBy: {
+              ...resource.likedBy,
+              [userId]: true
+            }
+          }
+        }
+        return resource
+      }))
+    } catch (err) {
+      console.error('Error liking resource:', err)
+      throw err
+    }
+  }, [])
+
+  // Share a resource
   const shareResource = useCallback(async (resourceId: string) => {
     try {
-      await communityResourcesService.share(resourceId)
-    } catch (error) {
-      console.error('Error sharing resource:', error)
-      throw error
+      await communityResourcesService.shareResource(resourceId)
+      // Optimistically update the UI
+      setResources(prev => prev.map(resource => {
+        if (resource.id === resourceId) {
+          return {
+            ...resource,
+            shares: (resource.shares || 0) + 1
+          }
+        }
+        return resource
+      }))
+    } catch (err) {
+      console.error('Error sharing resource:', err)
+      throw err
     }
   }, [])
 
+  // View a resource
   const viewResource = useCallback(async (resourceId: string) => {
     try {
-      await communityResourcesService.incrementViews(resourceId)
-    } catch (error) {
-      console.error('Error incrementing resource views:', error)
+      await communityResourcesService.viewResource(resourceId)
+      // Optimistically update the UI
+      setResources(prev => prev.map(resource => {
+        if (resource.id === resourceId) {
+          return {
+            ...resource,
+            views: (resource.views || 0) + 1
+          }
+        }
+        return resource
+      }))
+    } catch (err) {
+      console.error('Error updating view count:', err)
+      // Don't throw error for view count updates
     }
   }, [])
 
-  const isLiked = useCallback((resource: CommunityResource) => {
-    if (!user || !resource.likedBy) return false
-    return !!resource.likedBy[user.uid]
-  }, [user])
+  // Check if a resource is liked by the current user
+  const isLiked = useCallback((resource: CommunityResource, userId?: string) => {
+    if (!userId) return false
+    return Boolean(resource.likedBy?.[userId])
+  }, [])
 
   return {
-    resources,
+    resources: category ? resources.filter(r => r.category === category) : resources,
+    loading,
+    error,
+    likeResource,
+    shareResource,
+    viewResource,
+    isLiked
+  }
+}
+
+// Single Resource Hook
+export function useCommunityResource(resourceId: string) {
+  const [resource, setResource] = useState<CommunityResource | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const { user } = useAuth()
+
+  // Fetch resource
+  useEffect(() => {
+    const fetchResource = async () => {
+      try {
+        setLoading(true)
+        const data = await communityResourcesService.getResource(resourceId)
+        setResource(data)
+        setError(null)
+      } catch (err) {
+        setError('Failed to fetch resource')
+        console.error('Error fetching resource:', err)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchResource()
+  }, [resourceId])
+
+  // Like resource
+  const likeResource = useCallback(async (userId: string) => {
+    if (!resource) return
+    try {
+      await communityResourcesService.likeResource(resource.id, userId)
+      // Optimistically update the UI
+      setResource(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          likes: prev.likes + 1,
+          likedBy: {
+            ...prev.likedBy,
+            [userId]: true
+          }
+        }
+      })
+    } catch (err) {
+      console.error('Error liking resource:', err)
+      throw err
+    }
+  }, [resource])
+
+  // Share resource
+  const shareResource = useCallback(async () => {
+    if (!resource) return
+    try {
+      await communityResourcesService.shareResource(resource.id)
+      // Optimistically update the UI
+      setResource(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          shares: (prev.shares || 0) + 1
+        }
+      })
+    } catch (err) {
+      console.error('Error sharing resource:', err)
+      throw err
+    }
+  }, [resource])
+
+  // View resource
+  const viewResource = useCallback(async () => {
+    if (!resource) return
+    try {
+      await communityResourcesService.viewResource(resource.id)
+      // Optimistically update the UI
+      setResource(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          views: (prev.views || 0) + 1
+        }
+      })
+    } catch (err) {
+      console.error('Error updating view count:', err)
+      // Don't throw error for view count updates
+    }
+  }, [resource])
+
+  // Check if resource is liked by the current user
+  const isLiked = useCallback((userId?: string) => {
+    if (!resource || !userId) return false
+    return Boolean(resource.likedBy?.[userId])
+  }, [resource])
+
+  return {
+    resource,
     loading,
     error,
     likeResource,

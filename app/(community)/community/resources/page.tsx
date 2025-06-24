@@ -2,79 +2,92 @@
 
 import React, { useState } from 'react'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import Header from '@/components/layout/Header'
 import { HeaderAd, SidebarAd, AdSense } from '@/components/ui/AdSense'
 import { useCommunityResources } from '@/hooks/useCommunity'
-import type { CommunityResource } from '@/types/database'
+import type { CommunityResource, CommunityResourceType } from '@/types/database'
 import { formatDistanceToNow } from 'date-fns'
 import { Timestamp } from 'firebase/firestore'
 import ResourceSubmissionForm from '@/components/community/ResourceSubmissionForm'
 import { useAuth } from '@/hooks/useAuth'
 
-export default function ResourcesPage() {
-  const [selectedCategory, setSelectedCategory] = useState<string>('all')
-  const [showSubmissionForm, setShowSubmissionForm] = useState(false)
-  const { resources, loading, error, likeResource, shareResource, viewResource, isLiked } = useCommunityResources(selectedCategory)
-  const { user } = useAuth()
-
-  const categories = [
+const RESOURCE_CATEGORIES = [
     { id: 'all', name: 'All Resources' },
-    { id: 'food_assistance', name: 'Food Assistance' },
-    { id: 'nutrition', name: 'Nutrition' },
-    { id: 'cooking', name: 'Cooking' },
-    { id: 'budgeting', name: 'Budgeting' },
-    { id: 'other', name: 'Other Resources' }
+  { id: 'government', name: 'Government Programs' },
+  { id: 'local', name: 'Local Resources' },
+  { id: 'transportation', name: 'Transportation' },
+  { id: 'family', name: 'Family Services' },
+  { id: 'national', name: 'National Programs' },
+  { id: 'housing', name: 'Housing Assistance' },
+  { id: 'healthcare', name: 'Healthcare' },
+  { id: 'education', name: 'Education & Training' }
   ]
 
-  const getTypeIcon = (type: string) => {
+const getTypeIcon = (type: CommunityResourceType) => {
     switch (type) {
       case 'guide':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
           </svg>
         )
-      case 'article':
+    case 'website':
+      return (
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+        </svg>
+      )
+    case 'document':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9.5a2.5 2.5 0 00-2.5-2.5H14" />
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
           </svg>
         )
       case 'video':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
           </svg>
         )
-      case 'link':
+    case 'contact':
         return (
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
           </svg>
         )
-      default:
-        return null
     }
   }
 
-  const formatDate = (timestamp: Timestamp | Date | undefined) => {
-    if (!timestamp) return 'Recently'
-    const date = timestamp instanceof Timestamp ? timestamp.toDate() : timestamp
-    return formatDistanceToNow(date, { addSuffix: true })
+const formatDate = (date: Date | Timestamp) => {
+  const dateObj = date instanceof Timestamp ? date.toDate() : date
+  return formatDistanceToNow(dateObj, { addSuffix: true })
   }
 
-  const handleResourceClick = async (resource: CommunityResource) => {
-    await viewResource(resource.id)
+export default function ResourcesPage() {
+  const router = useRouter()
+  const [selectedCategory, setSelectedCategory] = useState<string>('all')
+  const [showSubmissionForm, setShowSubmissionForm] = useState(false)
+  const { resources, loading, error, likeResource, shareResource, isLiked } = useCommunityResources(selectedCategory === 'all' ? undefined : selectedCategory)
+  const { user } = useAuth()
+
+  const handleResourceClick = (resource: CommunityResource) => {
+    router.push(`/community/resources/${resource.id}`)
   }
 
-  const handleLikeClick = async (e: React.MouseEvent, resource: CommunityResource) => {
+  const handleExternalUrlClick = (e: React.MouseEvent, url: string) => {
     e.preventDefault()
     e.stopPropagation()
+    window.open(url, '_blank', 'noopener,noreferrer')
+  }
+
+  const handleLikeClick = async (e: React.MouseEvent, resourceId: string) => {
+    e.preventDefault() // Prevent navigation to detail page
     if (!user) {
       // TODO: Show login prompt
       return
     }
-    await likeResource(resource.id)
+    await likeResource(resourceId, user.uid)
   }
 
   const handleShareClick = async (e: React.MouseEvent, resource: CommunityResource) => {
@@ -85,7 +98,7 @@ export default function ResourcesPage() {
       await navigator.share({
         title: resource.title,
         text: resource.description,
-        url: window.location.href
+        url: `${window.location.origin}/community/resources/${resource.id}`
       })
       await shareResource(resource.id)
     } catch (error) {
@@ -123,35 +136,27 @@ export default function ResourcesPage() {
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <div className="sticky top-4">
+            {/* Categories */}
               <div className="bg-white border border-gray-200 rounded-lg p-6 mb-6">
                 <h2 className="text-lg font-semibold text-gray-900 mb-4">Categories</h2>
                 <nav className="space-y-2">
-                  {categories.map((category) => (
+                {RESOURCE_CATEGORIES.map(category => (
                     <button
                       key={category.id}
                       onClick={() => setSelectedCategory(category.id)}
-                      className={`w-full text-left px-3 py-2 rounded-md text-sm font-medium ${
+                    className={`block w-full text-left px-3 py-2 rounded-md text-sm ${
                         selectedCategory === category.id
-                          ? 'bg-blue-100 text-blue-700'
+                        ? 'bg-blue-50 text-blue-700 font-medium'
                           : 'text-gray-600 hover:bg-gray-50'
                       }`}
                     >
                       {category.name}
-                      <span className="float-right text-gray-400">
-                        {resources.filter(r => category.id === 'all' ? true : r.category === category.id).length}
-                      </span>
                     </button>
                   ))}
                 </nav>
               </div>
 
-              {/* Sidebar Ad */}
-              <div className="mb-6">
-                <SidebarAd />
-              </div>
-
-              {/* Submit Resource */}
+            {/* Submit Resource CTA */}
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
                 <h2 className="text-lg font-semibold text-blue-900 mb-2">Share Your Knowledge</h2>
                 <p className="text-blue-700 text-sm mb-4">
@@ -163,7 +168,6 @@ export default function ResourcesPage() {
                 >
                   Submit a Resource
                 </button>
-              </div>
             </div>
           </div>
 
@@ -203,16 +207,16 @@ export default function ResourcesPage() {
                         <div className="flex-1">
                           <div className="flex items-center space-x-2 mb-2">
                             <div className="flex items-center text-blue-600">
-                              {getTypeIcon(resource.contentType)}
+                              {getTypeIcon(resource.type)}
                             </div>
                             <h3 className="text-xl font-semibold text-gray-900">{resource.title}</h3>
                             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs bg-blue-100 text-blue-800">
-                              {categories.find(c => c.id === resource.category)?.name || resource.category}
+                              {RESOURCE_CATEGORIES.find(c => c.id === resource.category)?.name || resource.category}
                             </span>
                           </div>
                           <p className="text-gray-600 mb-3">{resource.description}</p>
                           <div className="flex items-center text-sm text-gray-500 space-x-4">
-                            <span>by {resource.author}</span>
+                            <span>by {resource.authorName}</span>
                             <span>•</span>
                             <span>{resource.views} views</span>
                             <span>•</span>
@@ -240,12 +244,12 @@ export default function ResourcesPage() {
                       <div className="flex items-center justify-between pt-4 border-t border-gray-200">
                         <div className="flex items-center space-x-4">
                           <button
-                            onClick={(e) => handleLikeClick(e, resource)}
+                            onClick={(e) => handleLikeClick(e, resource.id)}
                             className={`inline-flex items-center space-x-1 text-sm font-medium ${
-                              isLiked(resource) ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'
+                              isLiked(resource, user?.uid) ? 'text-blue-600' : 'text-gray-500 hover:text-blue-600'
                             }`}
                           >
-                            <svg className="w-5 h-5" fill={isLiked(resource) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-5 h-5" fill={isLiked(resource, user?.uid) ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
                             </svg>
                             <span>Like</span>
@@ -268,7 +272,7 @@ export default function ResourcesPage() {
                             target="_blank"
                             rel="noopener noreferrer"
                             className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                            onClick={(e) => e.stopPropagation()}
+                            onClick={(e) => handleExternalUrlClick(e, resource.externalUrl!)}
                           >
                             Visit Resource
                             <svg className="ml-1 w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">

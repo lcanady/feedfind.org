@@ -17,7 +17,10 @@ import {
   runTransaction,
   deleteField,
   DocumentReference,
-  Timestamp
+  Timestamp,
+  increment,
+  arrayUnion,
+  arrayRemove
 } from 'firebase/firestore'
 import { db } from './firebase'
 import {
@@ -449,31 +452,57 @@ export class CommunityEventsService extends DatabaseService {
 }
 
 // Community Resources Service
-export class CommunityResourcesService extends DatabaseService {
-  constructor() {
-    super('community_resources')
-  }
+class CommunityResourcesService {
+  private readonly collectionName = 'community_resources'
 
-  async create(data: CreateCommunityResourceData): Promise<string> {
+  async getResources() {
     try {
-      const docRef = await addDoc(collection(db, this.collectionName), {
-        ...data,
-        views: 0,
-        likes: 0,
-        shares: 0,
-        status: 'active',
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp()
-      })
-      return docRef.id
+      const q = query(collection(db, this.collectionName), where('status', '==', 'active'))
+      const snapshot = await getDocs(q)
+      return snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        createdAt: doc.data().createdAt,
+        updatedAt: doc.data().updatedAt
+      })) as CommunityResource[]
     } catch (error) {
-      console.error('Error creating community resource:', error)
+      console.error('Error fetching resources:', error)
       throw error
     }
   }
 
   async getResource(id: string): Promise<CommunityResource | null> {
-    return this.getDoc<CommunityResource>(id)
+    try {
+      const docRef = doc(db, this.collectionName, id)
+      const docSnap = await getDoc(docRef)
+      if (!docSnap.exists()) return null
+      return {
+        id: docSnap.id,
+        ...docSnap.data()
+      } as CommunityResource
+    } catch (error) {
+      console.error('Error fetching resource:', error)
+      throw error
+    }
+  }
+
+  async create(data: CreateCommunityResourceData) {
+    try {
+      const docRef = await addDoc(collection(db, this.collectionName), {
+        ...data,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        status: 'active',
+        views: 0,
+        likes: 0,
+        shares: 0,
+        likedBy: {}
+      })
+      return docRef.id
+    } catch (error) {
+      console.error('Error creating resource:', error)
+      throw error
+    }
   }
 
   async incrementViews(id: string): Promise<void> {
@@ -581,6 +610,46 @@ export class CommunityResourcesService extends DatabaseService {
       })) as CommunityResource[]
     } catch (error) {
       console.error('Error getting popular resources:', error)
+      throw error
+    }
+  }
+
+  async likeResource(resourceId: string, userId: string) {
+    try {
+      const resourceRef = doc(db, this.collectionName, resourceId)
+      await updateDoc(resourceRef, {
+        likes: increment(1),
+        [`likedBy.${userId}`]: true,
+        updatedAt: serverTimestamp()
+      })
+    } catch (error) {
+      console.error('Error liking resource:', error)
+      throw error
+    }
+  }
+
+  async shareResource(resourceId: string) {
+    try {
+      const resourceRef = doc(db, this.collectionName, resourceId)
+      await updateDoc(resourceRef, {
+        shares: increment(1),
+        updatedAt: serverTimestamp()
+      })
+    } catch (error) {
+      console.error('Error sharing resource:', error)
+      throw error
+    }
+  }
+
+  async viewResource(resourceId: string) {
+    try {
+      const resourceRef = doc(db, this.collectionName, resourceId)
+      await updateDoc(resourceRef, {
+        views: increment(1),
+        updatedAt: serverTimestamp()
+      })
+    } catch (error) {
+      console.error('Error updating view count:', error)
       throw error
     }
   }

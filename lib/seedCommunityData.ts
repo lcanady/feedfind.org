@@ -1,11 +1,9 @@
 import { 
-  forumService, 
   volunteerService, 
   communityEventsService, 
   communityResourcesService 
 } from './communityService'
 import type {
-  CreateForumPostData,
   CreateVolunteerOpportunityData,
   CreateCommunityEventData,
   CreateCommunityResourceData
@@ -237,57 +235,81 @@ export async function seedCommunityData() {
     // Seed Community Resources
     const communityResources: CreateCommunityResourceData[] = [
       {
-        title: 'Complete Guide to SNAP Benefits Application',
-        description: 'Step-by-step guide to applying for SNAP benefits, including required documents and eligibility requirements.',
+        title: 'SNAP Benefits Guide',
+        description: 'A comprehensive guide to applying for and using SNAP benefits (food stamps).',
         category: 'government',
         type: 'guide',
-        content: 'This comprehensive guide walks you through the entire SNAP application process...',
         authorId: 'admin123',
-        authorName: 'Community Team',
-        tags: ['SNAP', 'benefits', 'application', 'government-assistance'],
-        language: 'English',
-        targetAudience: ['Low-income families', 'First-time applicants'],
-        difficulty: 'beginner',
-        status: 'active'
+        authorName: 'FeedFind Team',
+        tags: ['snap', 'food-stamps', 'benefits'],
+        externalUrl: 'https://www.fns.usda.gov/snap/recipient/eligibility'
       },
       {
-        title: 'LA County Food Bank Locations',
-        description: 'Complete list of food bank locations throughout LA County with addresses, hours, and contact information.',
+        title: 'Local Food Bank Directory',
+        description: 'Find food banks and pantries in your area with operating hours and requirements.',
         category: 'local',
-        type: 'guide',
-        content: 'Here is a comprehensive list of food banks in LA County...',
-        url: 'https://www.lafoodbank.org/find-food/',
-        authorId: 'user456',
-        authorName: 'Maria R.',
-        tags: ['food-banks', 'los-angeles', 'locations'],
-        isLocationSpecific: true,
-        applicableZipCodes: ['90001', '90210', '90028', '90405'],
-        difficulty: 'beginner',
-        status: 'active'
+        type: 'website',
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['food-banks', 'pantries', 'local-help'],
+        externalUrl: 'https://www.feedingamerica.org/find-your-local-foodbank'
       },
       {
-        title: 'Transportation Resources for Food Access',
-        description: 'Information about free and low-cost transportation options to reach food assistance locations.',
+        title: 'Transportation Assistance Programs',
+        description: 'Information about free and reduced-cost transportation to food assistance locations.',
         category: 'transportation',
         type: 'guide',
-        content: 'Getting to food assistance locations can be challenging...',
-        authorId: 'user789',
-        authorName: 'David K.',
-        tags: ['transportation', 'access', 'public-transit'],
-        difficulty: 'beginner',
-        status: 'active'
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['transportation', 'access', 'mobility']
       },
       {
-        title: 'Emergency Food Assistance Hotline',
-        description: '24/7 hotline for emergency food assistance and resource referrals.',
+        title: 'Family Nutrition Program',
+        description: 'Educational resources for families about nutrition and healthy eating on a budget.',
+        category: 'family',
+        type: 'guide',
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['nutrition', 'education', 'family']
+      },
+      {
+        title: 'National Food Assistance Hotline',
+        description: '24/7 hotline for emergency food assistance and program information.',
         category: 'national',
         type: 'contact',
-        phoneNumber: '1-800-FOOD-HELP',
-        authorId: 'admin456',
-        authorName: 'National Resource Team',
-        tags: ['emergency', 'hotline', 'immediate-help'],
-        difficulty: 'beginner',
-        status: 'active'
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['hotline', 'emergency', 'assistance'],
+        phoneNumber: '1-866-3-HUNGRY'
+      },
+      {
+        title: 'Housing & Food Assistance Programs',
+        description: 'Combined resources for housing stability and food security.',
+        category: 'housing',
+        type: 'guide',
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['housing', 'stability', 'assistance']
+      },
+      {
+        title: 'Healthcare & Nutrition Support',
+        description: 'Medical resources and nutrition support for food-insecure individuals.',
+        category: 'healthcare',
+        type: 'website',
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['healthcare', 'nutrition', 'medical'],
+        externalUrl: 'https://health.gov/nutrition'
+      },
+      {
+        title: 'Cooking on a Budget Workshop',
+        description: 'Free online workshop teaching budget-friendly cooking skills.',
+        category: 'education',
+        type: 'video',
+        authorId: 'admin123',
+        authorName: 'FeedFind Team',
+        tags: ['cooking', 'education', 'budget'],
+        externalUrl: 'https://www.youtube.com/watch?v=example'
       }
     ]
 

@@ -3,12 +3,31 @@
 import React, { useState } from 'react'
 import { useAuth } from '@/hooks/useAuth'
 import { communityResourcesService } from '@/lib/communityService'
-import { CreateCommunityResourceData } from '@/types/database'
+import { CreateCommunityResourceData, CommunityResourceCategory, CommunityResourceType } from '@/types/database'
 
 interface ResourceSubmissionFormProps {
   onSuccess?: () => void
   onCancel?: () => void
 }
+
+const RESOURCE_CATEGORIES: { id: CommunityResourceCategory; name: string }[] = [
+  { id: 'government', name: 'Government Programs' },
+  { id: 'local', name: 'Local Resources' },
+  { id: 'transportation', name: 'Transportation' },
+  { id: 'family', name: 'Family Services' },
+  { id: 'national', name: 'National Programs' },
+  { id: 'housing', name: 'Housing Assistance' },
+  { id: 'healthcare', name: 'Healthcare' },
+  { id: 'education', name: 'Education & Training' }
+]
+
+const RESOURCE_TYPES: { id: CommunityResourceType; name: string }[] = [
+  { id: 'guide', name: 'Guide or Tutorial' },
+  { id: 'website', name: 'Website' },
+  { id: 'document', name: 'Document' },
+  { id: 'video', name: 'Video' },
+  { id: 'contact', name: 'Contact Information' }
+]
 
 export default function ResourceSubmissionForm({ onSuccess, onCancel }: ResourceSubmissionFormProps) {
   const { user } = useAuth()
@@ -18,11 +37,11 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
   const [formData, setFormData] = useState<Partial<CreateCommunityResourceData>>({
     title: '',
     description: '',
-    content: '',
-    contentType: 'article',
-    category: 'food_assistance',
-    organization: '',
-    tags: []
+    category: 'local',
+    type: 'guide',
+    tags: [],
+    externalUrl: '',
+    phoneNumber: ''
   })
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -38,8 +57,8 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
 
       await communityResourcesService.create({
         ...formData,
-        author: user.displayName || 'Anonymous',
-        authorId: user.uid
+        authorId: user.uid,
+        authorName: user.displayName || 'Anonymous'
       } as CreateCommunityResourceData)
 
       onSuccess?.()
@@ -62,7 +81,13 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-6 bg-white p-6 rounded-lg border border-gray-200">
+    <form onSubmit={handleSubmit} className="space-y-6">
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-md p-4 text-red-700 text-sm">
+          {error}
+        </div>
+      )}
+
       <div>
         <label htmlFor="title" className="block text-sm font-medium text-gray-700">
           Title
@@ -72,9 +97,10 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
           id="title"
           name="title"
           required
+          maxLength={100}
           value={formData.title}
           onChange={handleInputChange}
-          className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         />
       </div>
 
@@ -86,80 +112,79 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
           id="description"
           name="description"
           required
+          maxLength={2000}
           value={formData.description}
           onChange={handleInputChange}
-          rows={3}
-          className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          rows={4}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         />
       </div>
 
       <div>
-        <label htmlFor="content" className="block text-sm font-medium text-gray-700">
-          Content
+        <label htmlFor="category" className="block text-sm font-medium text-gray-700">
+          Category
         </label>
-        <textarea
-          id="content"
-          name="content"
+        <select
+          id="category"
+          name="category"
           required
-          value={formData.content}
+          value={formData.category}
           onChange={handleInputChange}
-          rows={6}
-          className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-        />
-      </div>
-
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <div>
-          <label htmlFor="contentType" className="block text-sm font-medium text-gray-700">
-            Content Type
-          </label>
-          <select
-            id="contentType"
-            name="contentType"
-            required
-            value={formData.contentType}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="article">Article</option>
-            <option value="guide">Guide</option>
-            <option value="video">Video</option>
-            <option value="link">Link</option>
-          </select>
-        </div>
-
-        <div>
-          <label htmlFor="category" className="block text-sm font-medium text-gray-700">
-            Category
-          </label>
-          <select
-            id="category"
-            name="category"
-            required
-            value={formData.category}
-            onChange={handleInputChange}
-            className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
-          >
-            <option value="food_assistance">Food Assistance</option>
-            <option value="nutrition">Nutrition</option>
-            <option value="cooking">Cooking</option>
-            <option value="budgeting">Budgeting</option>
-            <option value="other">Other</option>
-          </select>
-        </div>
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        >
+          {RESOURCE_CATEGORIES.map(category => (
+            <option key={category.id} value={category.id}>
+              {category.name}
+            </option>
+          ))}
+        </select>
       </div>
 
       <div>
-        <label htmlFor="organization" className="block text-sm font-medium text-gray-700">
-          Organization (optional)
+        <label htmlFor="type" className="block text-sm font-medium text-gray-700">
+          Resource Type
+        </label>
+        <select
+          id="type"
+          name="type"
+          required
+          value={formData.type}
+          onChange={handleInputChange}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        >
+          {RESOURCE_TYPES.map(type => (
+            <option key={type.id} value={type.id}>
+              {type.name}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div>
+        <label htmlFor="externalUrl" className="block text-sm font-medium text-gray-700">
+          External URL (optional)
         </label>
         <input
-          type="text"
-          id="organization"
-          name="organization"
-          value={formData.organization}
+          type="url"
+          id="externalUrl"
+          name="externalUrl"
+          value={formData.externalUrl}
           onChange={handleInputChange}
-          className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+        />
+      </div>
+
+      <div>
+        <label htmlFor="phoneNumber" className="block text-sm font-medium text-gray-700">
+          Phone Number (optional)
+        </label>
+        <input
+          type="tel"
+          id="phoneNumber"
+          name="phoneNumber"
+          value={formData.phoneNumber}
+          onChange={handleInputChange}
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         />
       </div>
 
@@ -173,14 +198,10 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
           name="tags"
           value={formData.tags?.join(', ')}
           onChange={handleTagInput}
-          placeholder="e.g., recipes, healthy, budget"
-          className="mt-1 block w-full rounded-md border border-gray-300 py-2 px-3 shadow-sm focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-500"
+          placeholder="e.g., food-banks, meals, assistance"
+          className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
         />
       </div>
-
-      {error && (
-        <div className="text-red-600 text-sm">{error}</div>
-      )}
 
       <div className="flex justify-end space-x-3">
         {onCancel && (
@@ -195,9 +216,7 @@ export default function ResourceSubmissionForm({ onSuccess, onCancel }: Resource
         <button
           type="submit"
           disabled={loading}
-          className={`px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-            loading ? 'opacity-50 cursor-not-allowed' : ''
-          }`}
+          className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
         >
           {loading ? 'Submitting...' : 'Submit Resource'}
         </button>
