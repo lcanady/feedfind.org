@@ -426,10 +426,10 @@ export default function VolunteerPage() {
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">about</h3>
               <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">help & FAQ</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">safety tips</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">terms of use</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>
+                <li><Link href="/help" className="text-blue-600 hover:underline">help & FAQ</Link></li>
+                <li><Link href="/help#safety-tips" className="text-blue-600 hover:underline">safety tips</Link></li>
+                <li><Link href="/terms" className="text-blue-600 hover:underline">terms of use</Link></li>
+                <li><Link href="/privacy" className="text-blue-600 hover:underline">privacy policy</Link></li>
               </ul>
             </div>
             <div>
@@ -445,7 +445,7 @@ export default function VolunteerPage() {
               <h3 className="font-semibold text-gray-900 mb-2">community</h3>
               <ul className="space-y-1">
                 <li><Link href="/community/volunteer" className="text-blue-600 hover:underline">volunteer opportunities</Link></li>
-                <li><a href="#" className="text-blue-600 hover:underline">donate to local organizations</a></li>
+                <li><Link href="/contact#partnerships" className="text-blue-600 hover:underline">donate to local organizations</Link></li>
                 <li><Link href="/community/forums" className="text-blue-600 hover:underline">community forums</Link></li>
                 <li><Link href="/community/resources" className="text-blue-600 hover:underline">resource guides</Link></li>
               </ul>
@@ -453,10 +453,10 @@ export default function VolunteerPage() {
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">contact</h3>
               <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">report an issue</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">suggest improvements</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">partnership inquiries</a></li>
-                <li><a href="#" className="text-blue-600 hover:underline">feedback</a></li>
+                <li><Link href="/contact#report-problems" className="text-blue-600 hover:underline">report an issue</Link></li>
+                <li><Link href="/contact#feedback-suggestions" className="text-blue-600 hover:underline">suggest improvements</Link></li>
+                <li><Link href="/contact#partnerships-media" className="text-blue-600 hover:underline">partnership inquiries</Link></li>
+                <li><Link href="/contact#feedback-suggestions" className="text-blue-600 hover:underline">feedback</Link></li>
               </ul>
             </div>
           </div>

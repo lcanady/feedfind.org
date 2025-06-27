@@ -715,37 +715,6 @@ export class ProviderService extends DatabaseService {
     return provider as Provider | null
   }
 
-  async getAnalytics(providerId: string): Promise<{
-    totalVisits: number
-    averageWaitTime: number
-    statusUpdateCount: number
-    userSatisfaction: number
-    thisWeek: {
-      visits: number
-      updates: number
-    }
-    lastWeek: {
-      visits: number
-      updates: number
-    }
-  }> {
-    // Mock analytics data for now - in production this would come from analytics service
-    return {
-      totalVisits: 1250,
-      averageWaitTime: 15,
-      statusUpdateCount: 45,
-      userSatisfaction: 4.2,
-      thisWeek: {
-        visits: 180,
-        updates: 12
-      },
-      lastWeek: {
-        visits: 165,
-        updates: 8
-      }
-    }
-  }
-
   async approve(
     providerId: string,
     adminId: string,
@@ -779,27 +748,40 @@ export class ProviderService extends DatabaseService {
 
   async getAllByUserId(userId: string): Promise<Provider[]> {
     try {
-      // First try to get provider with user ID as document ID (for compatibility)
-      const singleProvider = await this.get('providers', userId)
       const providers: Provider[] = []
       
+      // 1. Check for direct ownership (legacy)
+      const singleProvider = await this.get('providers', userId)
       if (singleProvider) {
         providers.push(singleProvider as Provider)
       }
 
-      // Also search for providers with managedBy field set to user ID
-      const results = await this.list('providers', {
+      // 2. Check for managed providers
+      const managedResults = await this.list('providers', {
         where: [{ field: 'managedBy', operator: '==', value: userId }]
       })
 
-      const managedProviders = results.docs.map(doc => ({
+      const managedProviders = managedResults.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
       })) as Provider[]
 
-      // Combine and deduplicate
-      const allProviders = [...providers, ...managedProviders]
-      const uniqueProviders = allProviders.filter((provider, index, self) => 
+      providers.push(...managedProviders)
+
+      // 3. Check for membership in organizations
+      const memberResults = await this.list('providers', {
+        where: [{ field: `members.${userId}`, operator: '!=', value: null }]
+      })
+
+      const memberProviders = memberResults.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as Provider[]
+
+      providers.push(...memberProviders)
+
+      // Deduplicate providers
+      const uniqueProviders = providers.filter((provider, index, self) => 
         index === self.findIndex(p => p.id === provider.id)
       )
 

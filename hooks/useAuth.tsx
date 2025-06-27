@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
+import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react'
 import {
   User as FirebaseUser,
   signInWithEmailAndPassword,
@@ -13,8 +13,10 @@ import {
 } from 'firebase/auth'
 import { doc, getDoc } from 'firebase/firestore'
 import { auth, db } from '../lib/firebase'
-import { User, AuthContextType } from '../types/auth'
+import { User, AuthContextType, OrganizationRole } from '../types/auth'
 import type { User as DatabaseUser } from '../types/database'
+import { Provider } from '../types/database'
+import { ProviderService } from '../lib/databaseService'
 
 // Create auth context
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -24,6 +26,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [currentOrganization, setCurrentOrganization] = useState<{ id: string; role: OrganizationRole } | undefined>()
 
   // Clear error helper
   const clearError = () => setError(null)
@@ -111,6 +114,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       
       // User state will be updated by onAuthStateChanged listener
       console.log('Logout successful')
+      
+      // Redirect to index page
+      window.location.href = '/'
     } catch (error: any) {
       const errorMessage = formatAuthError(error)
       setError(errorMessage)
@@ -266,28 +272,87 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return unsubscribe
   }, [])
 
-  const value: AuthContextType = {
+  const setCurrentOrganizationContext = useCallback(async (organizationId: string) => {
+    if (!user) return
+
+    try {
+      const providerService = new ProviderService()
+      const provider = await providerService.getById(organizationId)
+      
+      if (!provider) {
+        throw new Error('Organization not found')
+      }
+
+      const member = provider.members?.[user.uid]
+      if (!member && !isAdminOrSuperuser) {
+        throw new Error('You are not a member of this organization')
+      }
+
+      setCurrentOrganization({
+        id: organizationId,
+        role: member?.role || 'admin' // Admins get admin role by default
+      })
+    } catch (err) {
+      console.error('Failed to set organization context:', err)
+      setError(err instanceof Error ? err.message : 'Failed to set organization context')
+    }
+  }, [user, isAdminOrSuperuser])
+
+  const hasOrganizationPermission = useCallback(async (organizationId: string, permission: string): Promise<boolean> => {
+    if (!user || !currentOrganization || currentOrganization.id !== organizationId) return false
+    
+    // Admins and superusers have all permissions
+    if (isAdminOrSuperuser) return true
+
+    try {
+      // Get the provider service
+      const providerService = new ProviderService()
+      
+      // Get the member's permissions
+      const provider = await providerService.getById(organizationId)
+      if (!provider) return false
+
+      const member = provider.members?.[user.uid]
+      if (!member) return false
+
+      // Owners and admins have all permissions
+      if (member.role === 'owner' || member.role === 'admin') return true
+
+      // Check specific permission
+      return member.permissions?.[permission as keyof typeof member.permissions] || false
+    } catch (err) {
+      console.error('Failed to check organization permission:', err)
+      return false
+    }
+  }, [user, currentOrganization, isAdminOrSuperuser])
+
+  const getCurrentOrganizationRole = useCallback((): OrganizationRole | null => {
+    if (!user || !currentOrganization) return null
+    return currentOrganization.role
+  }, [user, currentOrganization])
+
+  const value = {
     user,
     loading,
     error,
+    currentOrganization,
     login,
     loginWithGoogle,
     logout,
     register,
     resetPassword,
     updateProfile,
-    isAuthenticated,
-    isProvider,
-    isAdmin,
-    isSuperuser,
-    isAdminOrSuperuser,
+    setCurrentOrganization: setCurrentOrganizationContext,
+    hasOrganizationPermission,
+    getCurrentOrganizationRole,
+    isAuthenticated: !!user,
+    isProvider: user?.role === 'provider',
+    isAdmin: user?.role === 'admin',
+    isSuperuser: user?.role === 'superuser',
+    isAdminOrSuperuser: user?.role === 'admin' || user?.role === 'superuser'
   }
 
-  return (
-    <AuthContext.Provider value={value}>
-      {children}
-    </AuthContext.Provider>
-  )
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 // useAuth hook

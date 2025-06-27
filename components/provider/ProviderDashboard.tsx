@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import { Timestamp } from 'firebase/firestore'
 import { ProviderService, LocationService, StatusUpdateService } from '../../lib/databaseService'
 import { CommunityEventsService } from '../../lib/communityService'
 import { useAuth } from '../../hooks/useAuth'
-import type { Provider, Location, StatusUpdate, CurrentLocationStatus, CommunityEvent } from '../../types/database'
+import type { Provider, Location, StatusUpdate, CurrentLocationStatus, CommunityEvent, OrganizationRole, OrganizationMember } from '../../types/database'
 import { ProviderRegistrationForm } from './ProviderRegistrationForm'
 import { VolunteerManagement } from './VolunteerManagement'
 import Link from 'next/link'
@@ -16,26 +17,20 @@ export interface ProviderDashboardProps {
   className?: string
 }
 
-interface AnalyticsData {
-  totalVisits: number;
-  averageWaitTime: number;
-  statusUpdateCount: number;
-  userSatisfaction: number;
-  thisWeek: {
-    visits: number;
-    updates: number;
-  };
-  lastWeek: {
-    visits: number;
-    updates: number;
-  };
-}
-
 interface DashboardData {
   provider: Provider;
   locations: Location[];
   recentUpdates: StatusUpdate[];
-  analytics: AnalyticsData | null;
+}
+
+interface OrganizationPermissions {
+  canManageLocations: boolean;
+  canUpdateStatus: boolean;
+  canManageEvents: boolean;
+  canManageResources: boolean;
+  canManageVolunteers: boolean;
+  canManageMembers: boolean;
+  canManageSettings: boolean;
 }
 
 interface LocationFormData {
@@ -50,7 +45,6 @@ interface LoadingStates {
   provider: boolean;
   locations: boolean;
   updates: boolean;
-  analytics: boolean;
   events?: boolean;
 }
 
@@ -58,8 +52,26 @@ interface LoadingErrors {
   provider?: string;
   locations?: string;
   updates?: string;
-  analytics?: string;
   events?: string;
+}
+
+interface MemberFormData {
+  userId: string;
+  role: OrganizationRole;
+  addedAt: Date | Timestamp;
+  addedBy: string;
+  lastActive: Date | Timestamp;
+  email?: string;
+  status?: 'pending' | 'approved' | 'rejected';
+  permissions: {
+    canManageLocations: boolean;
+    canUpdateStatus: boolean;
+    canManageEvents: boolean;
+    canManageResources: boolean;
+    canManageVolunteers: boolean;
+    canManageMembers: boolean;
+    canManageSettings: boolean;
+  };
 }
 
 export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
@@ -68,12 +80,11 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   onStatusUpdate,
   className = ''
 }) => {
-  const { user, isProvider, isAdminOrSuperuser } = useAuth()
+  const { user, isProvider, isAdminOrSuperuser, getCurrentOrganizationRole, hasOrganizationPermission } = useAuth()
   const [loadingStates, setLoadingStates] = useState<LoadingStates>({
     provider: true,
     locations: true,
-    updates: true,
-    analytics: true
+    updates: true
   })
   const [loadingErrors, setLoadingErrors] = useState<LoadingErrors>({})
   const [error, setError] = useState<string>('')
@@ -83,7 +94,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   const [showBulkUpdateModal, setShowBulkUpdateModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [selectedLocations, setSelectedLocations] = useState<string[]>([])
-  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'analytics' | 'volunteers' | 'events'>('overview')
+  const [activeTab, setActiveTab] = useState<'overview' | 'locations' | 'volunteers' | 'events' | 'members'>('overview')
   const [statusUpdateForm, setStatusUpdateForm] = useState({
     status: '' as CurrentLocationStatus | '',
     notes: '',
@@ -101,6 +112,28 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   const [loadingEvents, setLoadingEvents] = useState(false)
   const [eventError, setEventError] = useState<string>('')
   const [data, setData] = useState<DashboardData | null>(null)
+  const [permissions, setPermissions] = useState<OrganizationPermissions | null>(null)
+  const [members, setMembers] = useState<MemberFormData[]>([])
+  const [showMemberModal, setShowMemberModal] = useState(false)
+  const [selectedMember, setSelectedMember] = useState<MemberFormData | null>(null)
+  const [memberForm, setMemberForm] = useState<MemberFormData>({
+    userId: '',
+    role: 'worker',
+    addedAt: new Date(),
+    addedBy: user?.uid || '',
+    lastActive: new Date(),
+    email: '',
+    status: 'pending',
+    permissions: {
+      canManageLocations: false,
+      canUpdateStatus: true,
+      canManageEvents: true,
+      canManageResources: true,
+      canManageVolunteers: false,
+      canManageMembers: false,
+      canManageSettings: false
+    }
+  })
 
   // Services - memoized to prevent recreation on every render
   const providerService = useMemo(() => new ProviderService(), [])
@@ -112,17 +145,63 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   const hasAccess = useCallback(() => {
     if (!user) return false
     
-    // Allow access if user is the provider, or if user is admin/superuser
-    return (isProvider && user.uid === providerId) || isAdminOrSuperuser
-  }, [user, isProvider, isAdminOrSuperuser, providerId])
+    // Allow access if user is admin/superuser or has any role in the organization
+    return isAdminOrSuperuser || (data?.provider?.members?.[user.uid] !== undefined)
+  }, [user, isAdminOrSuperuser, data?.provider])
 
   // Check if user can edit (providers can edit their own, admins/superusers can edit any)
-  const canEdit = useCallback(() => {
+  const canEdit = useCallback(async () => {
     if (!user) return false
     
-    // Providers can edit their own dashboard, admins/superusers can edit any
-    return (isProvider && user.uid === providerId) || isAdminOrSuperuser
-  }, [user, isProvider, isAdminOrSuperuser, providerId])
+    // Admins/superusers can edit anything
+    if (isAdminOrSuperuser) return true
+
+    // Check organization role and permissions
+    const orgRole = getCurrentOrganizationRole()
+    if (!orgRole) return false
+
+    // Owners and admins can edit everything
+    if (orgRole === 'owner' || orgRole === 'admin') return true
+
+    // Workers need specific permissions
+    return permissions?.canManageLocations || false
+  }, [user, isAdminOrSuperuser, getCurrentOrganizationRole, permissions])
+
+  // Check if user can update status
+  const canUpdateStatus = useCallback(async () => {
+    if (!user) return false
+    
+    // Admins/superusers can update any status
+    if (isAdminOrSuperuser) return true
+
+    // Check organization role and permissions
+    const orgRole = getCurrentOrganizationRole()
+    if (!orgRole) return false
+
+    // Owners and admins can update status
+    if (orgRole === 'owner' || orgRole === 'admin') return true
+
+    // Workers need specific permissions
+    return permissions?.canUpdateStatus || false
+  }, [user, isAdminOrSuperuser, getCurrentOrganizationRole, permissions])
+
+  // Check if user can manage events
+  const canManageEvents = useCallback(async () => {
+    if (!user) return false
+    
+    // Admins/superusers can manage any events
+    if (isAdminOrSuperuser) return true
+
+    // Check organization role and permissions
+    const orgRole = getCurrentOrganizationRole()
+    if (!orgRole) return false
+
+    // Owners and admins can manage events
+    if (orgRole === 'owner' || orgRole === 'admin') return true
+
+    // Workers need specific permissions
+    return permissions?.canManageEvents || false
+  }, [user, isAdminOrSuperuser, getCurrentOrganizationRole, permissions])
 
   // Check if this is an admin view (admin/superuser viewing another provider's dashboard)
   const isAdminView = useCallback(() => {
@@ -137,8 +216,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       setShowRegistrationForm(false)
 
       // Check access first
-      if (!user || (!((isProvider && user.uid === providerId) || isAdminOrSuperuser))) {
-        throw new Error('Access denied. You do not have permission to view this dashboard.')
+      if (!user) {
+        throw new Error('You must be logged in to view this dashboard.')
       }
 
       // Load provider data
@@ -147,6 +226,35 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         setLoadingStates(prev => ({ ...prev, provider: true }))
         provider = await providerService.getById(providerId)
         setLoadingStates(prev => ({ ...prev, provider: false }))
+
+        // Set permissions based on organization role
+        if (provider) {
+          const member = provider.members?.[user.uid]
+          if (member) {
+            setPermissions(member.permissions || {
+              canManageLocations: member.role === 'owner' || member.role === 'admin',
+              canUpdateStatus: true, // All members can update status
+              canManageEvents: true, // All members can manage events
+              canManageResources: true, // All members can manage resources
+              canManageVolunteers: member.role === 'owner' || member.role === 'admin',
+              canManageMembers: member.role === 'owner' || member.role === 'admin',
+              canManageSettings: member.role === 'owner'
+            })
+          } else if (isAdminOrSuperuser) {
+            // Admins have all permissions
+            setPermissions({
+              canManageLocations: true,
+              canUpdateStatus: true,
+              canManageEvents: true,
+              canManageResources: true,
+              canManageVolunteers: true,
+              canManageMembers: true,
+              canManageSettings: true
+            })
+          } else {
+            setPermissions(null)
+          }
+        }
       } catch (err) {
         setLoadingStates(prev => ({ ...prev, provider: false }))
         setLoadingErrors(prev => ({ ...prev, provider: err instanceof Error ? err.message : 'Failed to load provider data' }))
@@ -166,19 +274,20 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         }
       }
 
-      // Initialize dashboard data with empty arrays
+      // Initialize dashboard data
       const dashboardData: DashboardData = {
         provider,
         locations: [],
-        recentUpdates: [],
-        analytics: null
+        recentUpdates: []
       }
 
       // Load locations with error handling
       try {
         setLoadingStates(prev => ({ ...prev, locations: true }))
         const locationsResult = await locationService.getByProviderId(providerId)
-        dashboardData.locations = Array.isArray(locationsResult) ? locationsResult : []
+        if (Array.isArray(locationsResult)) {
+          dashboardData.locations = locationsResult
+        }
         setLoadingStates(prev => ({ ...prev, locations: false }))
       } catch (err) {
         setLoadingStates(prev => ({ ...prev, locations: false }))
@@ -190,24 +299,14 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       try {
         setLoadingStates(prev => ({ ...prev, updates: true }))
         const updatesResult = await statusUpdateService.getRecentByProviderId(providerId)
-        dashboardData.recentUpdates = Array.isArray(updatesResult) ? updatesResult : []
+        if (Array.isArray(updatesResult)) {
+          dashboardData.recentUpdates = updatesResult
+        }
         setLoadingStates(prev => ({ ...prev, updates: false }))
       } catch (err) {
         setLoadingStates(prev => ({ ...prev, updates: false }))
         setLoadingErrors(prev => ({ ...prev, updates: err instanceof Error ? err.message : 'Failed to load status updates' }))
         console.error('Failed to load status updates:', err)
-      }
-      
-      // Load analytics with error handling
-      try {
-        setLoadingStates(prev => ({ ...prev, analytics: true }))
-        const analytics = await providerService.getAnalytics(providerId)
-        dashboardData.analytics = analytics
-        setLoadingStates(prev => ({ ...prev, analytics: false }))
-      } catch (err) {
-        setLoadingStates(prev => ({ ...prev, analytics: false }))
-        setLoadingErrors(prev => ({ ...prev, analytics: err instanceof Error ? err.message : 'Failed to load analytics' }))
-        console.error('Failed to load analytics:', err)
       }
 
       // Set the complete dashboard data
@@ -218,8 +317,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       setLoadingStates({
         provider: false,
         locations: false,
-        updates: false,
-        analytics: false
+        updates: false
       })
     }
   }, [providerId, providerService, locationService, statusUpdateService, isProvider, user?.uid, isAdminOrSuperuser])
@@ -256,20 +354,44 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     }
   }, [activeTab, providerId, communityEventsService])
 
+  // Load members when the members tab is active
+  useEffect(() => {
+    if (activeTab === 'members' && data?.provider?.members) {
+      const membersList = Object.entries(data.provider.members).map(([userId, member]) => ({
+        ...member,
+        userId,
+        lastActive: member.lastActive || new Date(),
+        status: 'approved' as const,
+        permissions: member.permissions || {
+          canManageLocations: member.role === 'owner' || member.role === 'admin',
+          canUpdateStatus: true,
+          canManageEvents: true,
+          canManageResources: true,
+          canManageVolunteers: member.role === 'owner' || member.role === 'admin',
+          canManageMembers: member.role === 'owner' || member.role === 'admin',
+          canManageSettings: member.role === 'owner'
+        }
+      }))
+      setMembers(membersList)
+    }
+  }, [activeTab, data?.provider?.members])
+
   // Handle provider creation
   const handleProviderCreated = useCallback((newProvider: Provider) => {
-    setData(prev => ({
-      ...prev,
-      provider: newProvider
-    }))
+    const newData: DashboardData = {
+      provider: newProvider,
+      locations: [],
+      recentUpdates: []
+    }
+    setData(newData)
     setShowRegistrationForm(false)
     setError('')
     
-    // Reload data to get locations and analytics
+    // Reload data to get locations
     setTimeout(() => {
       loadDashboardData()
     }, 0)
-  }, [])
+  }, [loadDashboardData])
 
   // Handle registration form cancel
   const handleRegistrationCancel = useCallback(() => {
@@ -285,7 +407,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
   // Status update handler
   const handleStatusUpdate = async (locationId: string, status: CurrentLocationStatus, notes?: string) => {
-    if (!canEdit()) {
+    const canUpdate = await canUpdateStatus()
+    if (!canUpdate) {
       setError('You do not have permission to update location status.')
       return
     }
@@ -338,7 +461,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
   // Bulk status update handler
   const handleBulkStatusUpdate = async (status: CurrentLocationStatus, locationIds: string[]) => {
-    if (!canEdit()) {
+    const canUpdate = await canUpdateStatus()
+    if (!canUpdate) {
       setError('You do not have permission to update location status.')
       return
     }
@@ -377,7 +501,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
 
   // Location edit handler
   const handleLocationEdit = async (locationId: string, updates: Partial<Location>) => {
-    if (!canEdit()) {
+    const canEditLocation = await canEdit()
+    if (!canEditLocation) {
       setError('You do not have permission to edit location details.')
       return
     }
@@ -438,26 +563,6 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
     loadDashboardData()
   }
 
-  // Download report function
-  const handleDownloadReport = () => {
-    const reportData = {
-      provider: data?.provider,
-      locations: data?.locations,
-      analytics: data?.analytics,
-      generatedAt: new Date().toISOString()
-    }
-    
-    const blob = new Blob([JSON.stringify(reportData, null, 2)], { type: 'application/json' })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement('a')
-    a.href = url
-    a.download = `provider-report-${providerId}-${new Date().toISOString().split('T')[0]}.json`
-    document.body.appendChild(a)
-    a.click()
-    document.body.removeChild(a)
-    URL.revokeObjectURL(url)
-  }
-
   // Status counts
   const statusCounts = data?.locations.reduce((acc, location) => {
     const status = location.currentStatus || 'unknown'
@@ -479,6 +584,175 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
   const isLoading = Object.values(loadingStates).some(Boolean)
   const isInitialLoad = Object.values(loadingStates).every(Boolean)
 
+  // Handle member update
+  const handleMemberUpdate = async (memberId: string, updates: Partial<MemberFormData>) => {
+    try {
+      if (!data?.provider) return
+
+      const canManage = await canEdit()
+      if (!canManage) {
+        setError('You do not have permission to manage members')
+        return
+      }
+
+      // Update member in provider document
+      await providerService.updateProvider(providerId, {
+        [`members.${memberId}`]: {
+          ...data.provider.members?.[memberId],
+          ...updates,
+          updatedAt: new Date()
+        }
+      })
+
+      // Reload dashboard data
+      await loadDashboardData()
+      setShowMemberModal(false)
+      setSelectedMember(null)
+      setError('Member updated successfully')
+    } catch (err) {
+      console.error('Failed to update member:', err)
+      setError('Failed to update member')
+    }
+  }
+
+  // Handle new member invitation
+  const handleMemberInvite = async (e: React.FormEvent) => {
+    e.preventDefault()
+    
+    try {
+      const canManage = await canEdit()
+      if (!canManage) {
+        setError('You do not have permission to manage members')
+        return
+      }
+
+      // Add new member to provider document
+      await providerService.updateProvider(providerId, {
+        [`members.temp_${Date.now()}`]: {
+          email: memberForm.email,
+          role: memberForm.role,
+          status: 'pending',
+          addedAt: new Date(),
+          addedBy: user?.uid,
+          permissions: memberForm.permissions
+        }
+      })
+
+      // Reload dashboard data
+      await loadDashboardData()
+      setShowMemberModal(false)
+      setMemberForm({
+        userId: '',
+        email: '',
+        role: 'worker',
+        addedAt: new Date(),
+        addedBy: user?.uid || '',
+        lastActive: new Date(),
+        status: 'pending',
+        permissions: {
+          canManageLocations: false,
+          canUpdateStatus: true,
+          canManageEvents: true,
+          canManageResources: true,
+          canManageVolunteers: false,
+          canManageMembers: false,
+          canManageSettings: false
+        }
+      })
+      setError('Member invited successfully')
+    } catch (err) {
+      console.error('Failed to invite member:', err)
+      setError('Failed to invite member')
+    }
+  }
+
+  const handleAddMember = () => {
+    const newMemberForm: MemberFormData = {
+      userId: '',
+      role: 'worker',
+      addedAt: new Date(),
+      addedBy: user?.uid || '',
+      lastActive: new Date(),
+      email: '',
+      status: 'pending',
+      permissions: {
+        canManageLocations: false,
+        canUpdateStatus: true,
+        canManageEvents: true,
+        canManageResources: true,
+        canManageVolunteers: false,
+        canManageMembers: false,
+        canManageSettings: false
+      }
+    }
+    setMemberForm(newMemberForm)
+    setShowMemberModal(true)
+  }
+
+  const handleEditMember = (member: MemberFormData) => {
+    setSelectedMember(member)
+    setMemberForm(member)
+    setShowMemberModal(true)
+  }
+
+  const handleSaveMember = async () => {
+    try {
+      if (!data?.provider) return
+
+      const updatedMembers = { ...data.provider.members }
+      
+      if (memberForm.userId) {
+        updatedMembers[memberForm.userId] = {
+          userId: memberForm.userId,
+          role: memberForm.role,
+          addedAt: memberForm.addedAt,
+          addedBy: memberForm.addedBy,
+          lastActive: memberForm.lastActive,
+          permissions: memberForm.permissions
+        }
+      }
+
+      await providerService.update('providers', providerId, {
+        members: updatedMembers
+      })
+
+      setShowMemberModal(false)
+      setSelectedMember(null)
+      const resetForm: MemberFormData = {
+        userId: '',
+        role: 'worker',
+        addedAt: new Date(),
+        addedBy: user?.uid || '',
+        lastActive: new Date(),
+        email: '',
+        status: 'pending',
+        permissions: {
+          canManageLocations: false,
+          canUpdateStatus: true,
+          canManageEvents: true,
+          canManageResources: true,
+          canManageVolunteers: false,
+          canManageMembers: false,
+          canManageSettings: false
+        }
+      }
+      setMemberForm(resetForm)
+    } catch (error) {
+      console.error('Error saving member:', error)
+      setError('Failed to save member')
+    }
+  }
+
+  const handleUpdatePermission = (permission: keyof MemberFormData['permissions'], value: boolean) => {
+    setMemberForm(prev => ({
+      ...prev,
+      permissions: {
+        ...prev.permissions,
+        [permission]: value
+      }
+    }))
+  }
+
   if (isInitialLoad) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
@@ -488,7 +762,6 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
           {loadingStates.provider && <p>Loading provider information...</p>}
           {loadingStates.locations && <p>Loading location data...</p>}
           {loadingStates.updates && <p>Loading status updates...</p>}
-          {loadingStates.analytics && <p>Loading analytics...</p>}
         </div>
       </div>
     )
@@ -633,6 +906,11 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                 )}
               </div>
             )}
+            {getCurrentOrganizationRole() && (
+              <span className="mt-2 inline-block px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-800">
+                Role: {getCurrentOrganizationRole()}
+              </span>
+            )}
           </div>
           {isAdminView() && (
             <div className="flex flex-col space-y-2 mt-4 sm:mt-0">
@@ -667,8 +945,8 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       )}
 
       {/* Tabs */}
-      <div className="border-b border-gray-200 mb-6">
-        <nav className="-mb-px flex space-x-8">
+      <div className="border-b border-gray-200">
+        <nav className="-mb-px flex space-x-8" aria-label="Dashboard Navigation">
           <button
             onClick={() => setActiveTab('overview')}
             className={`${
@@ -679,46 +957,54 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
           >
             Overview
           </button>
-          <button
-            onClick={() => setActiveTab('locations')}
-            className={`${
-              activeTab === 'locations'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Locations
-          </button>
-          <button
-            onClick={() => setActiveTab('events')}
-            className={`${
-              activeTab === 'events'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Events
-          </button>
-          <button
-            onClick={() => setActiveTab('volunteers')}
-            className={`${
-              activeTab === 'volunteers'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Volunteer Management
-          </button>
-          <button
-            onClick={() => setActiveTab('analytics')}
-            className={`${
-              activeTab === 'analytics'
-                ? 'border-blue-500 text-blue-600'
-                : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
-          >
-            Analytics
-          </button>
+          {(permissions?.canManageLocations || isAdminOrSuperuser) && (
+            <button
+              onClick={() => setActiveTab('locations')}
+              className={`${
+                activeTab === 'locations'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Locations
+            </button>
+          )}
+          {(permissions?.canManageVolunteers || isAdminOrSuperuser) && (
+            <button
+              onClick={() => setActiveTab('volunteers')}
+              className={`${
+                activeTab === 'volunteers'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Volunteers
+            </button>
+          )}
+          {(permissions?.canManageEvents || isAdminOrSuperuser) && (
+            <button
+              onClick={() => setActiveTab('events')}
+              className={`${
+                activeTab === 'events'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Events
+            </button>
+          )}
+          {(permissions?.canManageMembers || isAdminOrSuperuser) && (
+            <button
+              onClick={() => setActiveTab('members')}
+              className={`${
+                activeTab === 'members'
+                  ? 'border-blue-500 text-blue-600'
+                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+              } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}
+            >
+              Members
+            </button>
+          )}
         </nav>
       </div>
 
@@ -790,7 +1076,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         </div>
       )}
 
-      {activeTab === 'locations' && (
+      {activeTab === 'locations' && (permissions?.canManageLocations || isAdminOrSuperuser) && (
         <div>
           {/* Bulk Actions */}
           {selectedLocations.length > 0 && (
@@ -873,7 +1159,11 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         </div>
       )}
 
-      {activeTab === 'events' && (
+      {activeTab === 'volunteers' && (permissions?.canManageVolunteers || isAdminOrSuperuser) && (
+        <VolunteerManagement providerId={providerId} />
+      )}
+
+      {activeTab === 'events' && (permissions?.canManageEvents || isAdminOrSuperuser) && (
         <div>
           {/* Events Header */}
           <div className="flex justify-between items-center mb-6">
@@ -974,69 +1264,64 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
         </div>
       )}
 
-      {activeTab === 'volunteers' && (
-        <VolunteerManagement providerId={providerId} />
-      )}
+      {activeTab === 'members' && (permissions?.canManageMembers || isAdminOrSuperuser) && (
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-gray-900">Organization Members</h2>
+            <button
+              onClick={() => setShowMemberModal(true)}
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              Add Member
+            </button>
+          </div>
 
-      {activeTab === 'analytics' && (
-        <div>
-          {data.analytics ? (
-            <div className="space-y-6">
-              {/* Key Metrics */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-sm font-medium text-gray-500">Total Visits</h3>
-                  <p className="text-2xl font-bold text-gray-900">{data.analytics.totalVisits}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-sm font-medium text-gray-500">Avg. Wait Time</h3>
-                  <p className="text-2xl font-bold text-gray-900">{data.analytics.averageWaitTime}min</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-sm font-medium text-gray-500">Status Updates</h3>
-                  <p className="text-2xl font-bold text-gray-900">{data.analytics.statusUpdateCount}</p>
-                </div>
-                <div className="bg-white border border-gray-200 rounded-lg p-6">
-                  <h3 className="text-sm font-medium text-gray-500">User Satisfaction</h3>
-                  <p className="text-2xl font-bold text-gray-900">{data.analytics.userSatisfaction}/5</p>
-                </div>
-              </div>
-
-              {/* Trending Data */}
-              <div className="bg-white border border-gray-200 rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-lg font-semibold text-gray-900">Trends</h3>
-                  <button
-                    onClick={handleDownloadReport}
-                    className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-green-500"
-                  >
-                    Download Report
-                  </button>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">This Week</h4>
-                    <p className="text-gray-600">Visits: {data.analytics.thisWeek?.visits || 0}</p>
-                    <p className="text-gray-600">Updates: {data.analytics.thisWeek?.updates || 0}</p>
+          <div className="bg-white shadow overflow-hidden sm:rounded-lg">
+            <ul className="divide-y divide-gray-200">
+              {members.map((member) => (
+                <li key={member.userId} className="px-4 py-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm font-medium text-gray-900">{member.email}</p>
+                      <div className="mt-1 flex items-center space-x-2">
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          member.role === 'owner' ? 'bg-purple-100 text-purple-800' :
+                          member.role === 'admin' ? 'bg-blue-100 text-blue-800' :
+                          'bg-gray-100 text-gray-800'
+                        }`}>
+                          {member.role}
+                        </span>
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                          member.status === 'approved' ? 'bg-green-100 text-green-800' :
+                          member.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                          'bg-red-100 text-red-800'
+                        }`}>
+                          {member.status}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex space-x-3">
+                      <button
+                        onClick={() => {
+                          setSelectedMember(member)
+                          setShowMemberModal(true)
+                        }}
+                        className="text-blue-600 hover:text-blue-900 text-sm font-medium"
+                        disabled={member.role === 'owner' && getCurrentOrganizationRole() !== 'owner'}
+                      >
+                        Edit
+                      </button>
+                    </div>
                   </div>
-                  <div>
-                    <h4 className="font-medium text-gray-900 mb-2">vs Last Week</h4>
-                    <p className="text-gray-600">Visits: {data.analytics.lastWeek?.visits || 0}</p>
-                    <p className="text-gray-600">Updates: {data.analytics.lastWeek?.updates || 0}</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 text-center">
-              <p className="text-gray-500">Analytics data not available</p>
-            </div>
-          )}
+                </li>
+              ))}
+            </ul>
+          </div>
         </div>
       )}
 
       {/* Status Update Modal */}
-      {showStatusModal && selectedLocation && (
+      {showStatusModal && selectedLocation && (canUpdateStatus() || isAdminOrSuperuser) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">
@@ -1105,7 +1390,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       )}
 
       {/* Edit Location Modal */}
-      {showEditModal && selectedLocation && (
+      {showEditModal && selectedLocation && (permissions?.canManageLocations || isAdminOrSuperuser) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-lg">
             <h3 className="text-lg font-semibold mb-4">Edit Location: {selectedLocation.name}</h3>
@@ -1186,7 +1471,7 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
       )}
 
       {/* Bulk Update Modal */}
-      {showBulkUpdateModal && (
+      {showBulkUpdateModal && (canUpdateStatus() || isAdminOrSuperuser) && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 w-full max-w-md">
             <h3 className="text-lg font-semibold mb-4">Bulk Update Status</h3>
@@ -1244,6 +1529,188 @@ export const ProviderDashboard: React.FC<ProviderDashboardProps> = ({
                   className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:bg-gray-300"
                 >
                   Update All
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Member Modal */}
+      {showMemberModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <h3 className="text-lg font-semibold mb-4">
+              {selectedMember ? 'Edit Member' : 'Invite New Member'}
+            </h3>
+            <form onSubmit={selectedMember ? 
+              (e) => {
+                e.preventDefault()
+                handleSaveMember()
+              } : 
+              handleMemberInvite
+            }>
+              <div className="space-y-4">
+                <div>
+                  <label htmlFor="email" className="block text-sm font-medium text-gray-700">Email</label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={memberForm.email}
+                    onChange={(e) => setMemberForm(prev => ({ ...prev, email: e.target.value }))}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    disabled={!!selectedMember}
+                    required
+                  />
+                </div>
+                <div>
+                  <label htmlFor="role" className="block text-sm font-medium text-gray-700">Role</label>
+                  <select
+                    id="role"
+                    value={memberForm.role}
+                    onChange={(e) => setMemberForm(prev => ({ ...prev, role: e.target.value as OrganizationRole }))}
+                    className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    disabled={selectedMember?.role === 'owner' && getCurrentOrganizationRole() !== 'owner'}
+                  >
+                    <option value="worker">Worker</option>
+                    <option value="admin">Admin</option>
+                    {getCurrentOrganizationRole() === 'owner' && (
+                      <option value="owner">Owner</option>
+                    )}
+                  </select>
+                </div>
+                {selectedMember && (
+                  <div>
+                    <label htmlFor="status" className="block text-sm font-medium text-gray-700">Status</label>
+                    <select
+                      id="status"
+                      value={memberForm.status}
+                      onChange={(e) => setMemberForm(prev => ({ 
+                        ...prev, 
+                        status: e.target.value as 'pending' | 'approved' | 'rejected'
+                      }))}
+                      className="mt-1 block w-full border border-gray-300 rounded-md px-3 py-2"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="approved">Approved</option>
+                      <option value="rejected">Rejected</option>
+                    </select>
+                  </div>
+                )}
+                {memberForm.role === 'worker' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">Permissions</label>
+                    <div className="space-y-2">
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.permissions.canManageLocations}
+                          onChange={(e) => setMemberForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canManageLocations: e.target.checked }
+                          }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Manage Locations</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.permissions.canUpdateStatus}
+                          onChange={(e) => setMemberForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canUpdateStatus: e.target.checked }
+                          }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Update Status</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.permissions.canManageEvents}
+                          onChange={(e) => setMemberForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canManageEvents: e.target.checked }
+                          }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Manage Events</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.permissions.canManageResources}
+                          onChange={(e) => setMemberForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canManageResources: e.target.checked }
+                          }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Manage Resources</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.permissions.canManageVolunteers}
+                          onChange={(e) => setMemberForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canManageVolunteers: e.target.checked }
+                          }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Manage Volunteers</span>
+                      </label>
+                      <label className="flex items-center">
+                        <input
+                          type="checkbox"
+                          checked={memberForm.permissions.canManageMembers}
+                          onChange={(e) => setMemberForm(prev => ({
+                            ...prev,
+                            permissions: { ...prev.permissions, canManageMembers: e.target.checked }
+                          }))}
+                          className="mr-2"
+                        />
+                        <span className="text-sm text-gray-700">Manage Members</span>
+                      </label>
+                    </div>
+                  </div>
+                )}
+              </div>
+              <div className="mt-6 flex justify-end space-x-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowMemberModal(false)
+                    setSelectedMember(null)
+                    setMemberForm({
+                      userId: '',
+                      email: '',
+                      role: 'worker',
+                      addedAt: new Date(),
+                      addedBy: user?.uid || '',
+                      lastActive: new Date(),
+                      status: 'pending',
+                      permissions: {
+                        canManageLocations: false,
+                        canUpdateStatus: true,
+                        canManageEvents: true,
+                        canManageResources: true,
+                        canManageVolunteers: false,
+                        canManageMembers: false,
+                        canManageSettings: false
+                      }
+                    })
+                  }}
+                  className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                >
+                  {selectedMember ? 'Save Changes' : 'Send Invitation'}
                 </button>
               </div>
             </form>

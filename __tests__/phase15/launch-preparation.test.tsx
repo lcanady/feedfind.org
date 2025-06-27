@@ -106,25 +106,9 @@ jest.mock('../../lib/databaseService', () => {
     }
   ]
 
-  const mockAnalytics = {
-    totalVisits: 1250,
-    averageWaitTime: 15,
-    statusUpdateCount: 48,
-    userSatisfaction: 4.2,
-    thisWeek: {
-      visits: 320,
-      updates: 12
-    },
-    lastWeek: {
-      visits: 280,
-      updates: 8
-    }
-  }
-
   return {
     ProviderService: jest.fn().mockImplementation(() => ({
-      getById: jest.fn().mockResolvedValue(mockProvider),
-      getAnalytics: jest.fn().mockResolvedValue(mockAnalytics)
+      getById: jest.fn().mockResolvedValue(mockProvider)
     })),
     LocationService: jest.fn().mockImplementation(() => ({
       getByProviderId: jest.fn().mockResolvedValue(mockLocations),

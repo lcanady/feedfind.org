@@ -87,6 +87,27 @@ export interface User extends BaseDocument {
   privacyPolicyAcceptedAt?: Timestamp | Date
 }
 
+// Organization role types
+export type OrganizationRole = 'owner' | 'admin' | 'worker'
+
+// Organization member structure
+export interface OrganizationMember {
+  userId: string
+  role: OrganizationRole
+  addedAt: Timestamp | Date
+  addedBy: string
+  lastActive?: Timestamp | Date
+  permissions?: {
+    canManageLocations: boolean
+    canUpdateStatus: boolean
+    canManageEvents: boolean
+    canManageResources: boolean
+    canManageVolunteers: boolean
+    canManageMembers: boolean
+    canManageSettings: boolean
+  }
+}
+
 // Provider document structure
 export interface Provider extends BaseDocument {
   organizationName: string
@@ -104,6 +125,7 @@ export interface Provider extends BaseDocument {
   adminNotes?: string
   locationIds?: string[] // Array of location IDs managed by this provider
   managedBy?: string // User ID of who manages this provider (for multiple orgs per user)
+  members?: Record<string, OrganizationMember> // Map of userId to member details
   socialMedia?: {
     facebook?: string
     twitter?: string

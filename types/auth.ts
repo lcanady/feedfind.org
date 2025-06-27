@@ -1,9 +1,11 @@
 import { User as FirebaseUser } from 'firebase/auth'
+import { OrganizationRole } from './database'
 
 // Enhanced user interface extending Firebase User
 export interface User extends FirebaseUser {
   role?: 'user' | 'provider' | 'admin' | 'superuser'
   profile?: UserProfile
+  organizationRoles?: Record<string, OrganizationRole> // Map of organizationId to role
 }
 
 // User profile information
@@ -58,6 +60,10 @@ export interface AuthState {
   user: User | null
   loading: boolean
   error: string | null
+  currentOrganization?: {
+    id: string
+    role: OrganizationRole
+  }
 }
 
 // Authentication actions
@@ -68,6 +74,9 @@ export interface AuthActions {
   register: (email: string, password: string) => Promise<void>
   resetPassword: (email: string) => Promise<void>
   updateProfile: (profileData: Partial<ProfileFormData>) => Promise<void>
+  setCurrentOrganization: (organizationId: string) => Promise<void>
+  hasOrganizationPermission: (organizationId: string, permission: string) => Promise<boolean>
+  getCurrentOrganizationRole: () => OrganizationRole | null
   isAuthenticated: boolean
   isProvider: boolean
   isAdmin: boolean

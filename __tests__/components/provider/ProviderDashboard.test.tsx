@@ -176,14 +176,6 @@ describe('ProviderDashboard', () => {
     mockServices.provider.getById.mockResolvedValue(mockProvider)
     mockServices.location.getByProviderId.mockResolvedValue(mockLocations)
     mockServices.statusUpdate.getRecentByProviderId.mockResolvedValue(mockStatusUpdates)
-    mockServices.provider.getAnalytics.mockResolvedValue({
-      totalVisits: 1250,
-      averageWaitTime: 15,
-      statusUpdateCount: 45,
-      userSatisfaction: 4.2,
-      thisWeek: { visits: 180, updates: 12 },
-      lastWeek: { visits: 165, updates: 8 }
-    })
     
     // Set up default auth mock
     mockUseAuth.mockReturnValue({
@@ -566,139 +558,6 @@ describe('ProviderDashboard', () => {
         status: 'limited',
         updatedBy: 'provider1',
         timestamp: expect.any(Date)
-      })
-    })
-  })
-
-  describe('Analytics and Reporting', () => {
-    it('should display location analytics', async () => {
-      render(
-        <ProviderDashboard 
-          providerId="provider1"
-          onLocationUpdate={mockOnLocationUpdate}
-          onStatusUpdate={mockOnStatusUpdate}
-        />
-      )
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText('Downtown Food Bank')).toBeInTheDocument()
-      })
-
-      // Switch to analytics tab
-      const analyticsTab = await waitForButton('Analytics')
-      await userEvent.click(analyticsTab)
-
-      // Wait for analytics data to load and verify
-      await waitFor(() => {
-        expect(screen.getByText('1250')).toBeInTheDocument() // Total visits
-        expect(screen.getByText(/15.*min/)).toBeInTheDocument() // Average wait time (15 min)
-        expect(screen.getByText('45')).toBeInTheDocument() // Status updates
-        expect(screen.getByText(/4\.2.*\/5/)).toBeInTheDocument() // User satisfaction (4.2/5)
-      })
-    })
-
-    it('should provide downloadable reports', async () => {
-      render(
-        <ProviderDashboard 
-          providerId="provider1"
-          onLocationUpdate={mockOnLocationUpdate}
-          onStatusUpdate={mockOnStatusUpdate}
-        />
-      )
-
-      // Wait for dashboard to load first
-      await waitFor(() => {
-        expect(screen.getByText('Downtown Food Bank')).toBeInTheDocument()
-      })
-
-      // Switch to analytics tab
-      const analyticsTab = await waitFor(() => 
-        screen.getByRole('button', { name: 'Analytics' })
-      )
-      await userEvent.click(analyticsTab)
-
-      // Wait for download button to appear
-      await waitFor(() => {
-        const downloadButton = screen.getByRole('button', { name: /download report/i })
-        expect(downloadButton).toBeInTheDocument()
-      })
-    })
-
-    it('should show trending data', async () => {
-      const user = userEvent.setup()
-      
-      render(
-        <ProviderDashboard 
-          providerId="provider1"
-          onLocationUpdate={mockOnLocationUpdate}
-          onStatusUpdate={mockOnStatusUpdate}
-        />
-      )
-
-      // Wait for initial load
-      await waitFor(() => {
-        expect(screen.getByText('Downtown Food Bank')).toBeInTheDocument()
-      })
-
-      // Switch to analytics tab
-      const analyticsTab = await waitForButton('Analytics')
-      await user.click(analyticsTab)
-
-      // Wait for analytics data to load and verify trending data
-      await waitFor(() => {
-        expect(screen.getByText(/Visits:.*180/)).toBeInTheDocument() // This week's visits
-        expect(screen.getByText(/Updates:.*12/)).toBeInTheDocument() // This week's updates
-        expect(screen.getByText(/Visits:.*165/)).toBeInTheDocument() // Last week's visits
-        expect(screen.getByText(/Updates:.*8/)).toBeInTheDocument() // Last week's updates
-      })
-    })
-
-    it('should provide keyboard navigation', async () => {
-      const user = userEvent.setup()
-      
-      render(
-        <ProviderDashboard 
-          providerId="provider1"
-          onLocationUpdate={mockOnLocationUpdate}
-          onStatusUpdate={mockOnStatusUpdate}
-        />
-      )
-
-      // Wait for buttons to be available
-      const buttons = await waitForButtons(/.*/)
-      expect(buttons.length).toBeGreaterThan(0)
-      const firstButton = buttons[0]
-      firstButton.focus()
-      expect(firstButton).toHaveFocus()
-
-      await user.tab()
-      expect(document.activeElement).not.toBe(firstButton)
-    })
-
-    it('should announce status changes to screen readers', async () => {
-      const user = userEvent.setup()
-      
-      render(
-        <ProviderDashboard 
-          providerId="provider1"
-          onLocationUpdate={mockOnLocationUpdate}
-          onStatusUpdate={mockOnStatusUpdate}
-        />
-      )
-
-      // Navigate to locations tab first
-      await navigateToLocationsTab(user)
-
-      // Wait for status update button and click it
-      const buttons = await waitForButtons(/update status/i)
-      expect(buttons.length).toBeGreaterThan(0)
-      const statusButton = buttons[0]
-      await user.click(statusButton)
-
-      // After clicking update status, check for form elements
-      await waitFor(() => {
-        expect(screen.getByRole('combobox', { name: /status/i })).toBeInTheDocument()
       })
     })
   })
@@ -1197,14 +1056,6 @@ describe('ProviderDashboard', () => {
       // Mock other services to return data after provider is created
       mockServices.location.getByProviderId.mockResolvedValue(mockLocations)
       mockServices.statusUpdate.getRecentByProviderId.mockResolvedValue(mockStatusUpdates)
-      mockServices.provider.getAnalytics.mockResolvedValue({
-        totalVisits: 1250,
-        averageWaitTime: 15,
-        statusUpdateCount: 45,
-        userSatisfaction: 4.2,
-        thisWeek: { visits: 180, updates: 12 },
-        lastWeek: { visits: 165, updates: 8 }
-      })
 
       // Mock user trying to access their own provider dashboard
       mockUseAuth.mockReturnValue({

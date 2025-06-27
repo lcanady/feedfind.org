@@ -300,7 +300,7 @@ export default function AddOrganizationPage() {
             <div>
               <h3 className="font-semibold text-gray-900 mb-2">about</h3>
               <ul className="space-y-1">
-                <li><a href="#" className="text-blue-600 hover:underline">help & FAQ</a></li>
+                <li><Link href="/help" className="text-blue-600 hover:underline">help & FAQ</Link></li>
                 <li><a href="#" className="text-blue-600 hover:underline">safety tips</a></li>
                 <li><a href="#" className="text-blue-600 hover:underline">terms of use</a></li>
                 <li><a href="#" className="text-blue-600 hover:underline">privacy policy</a></li>

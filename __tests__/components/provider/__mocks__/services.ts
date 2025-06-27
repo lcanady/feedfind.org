@@ -4,8 +4,7 @@ export const mockServices = {
     getById: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
-    getLocations: jest.fn(),
-    getAnalytics: jest.fn()
+    getLocations: jest.fn()
   },
   location: {
     getByProviderId: jest.fn(),
