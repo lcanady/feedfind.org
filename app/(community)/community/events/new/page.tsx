@@ -71,12 +71,15 @@ export default function NewEventPage() {
         
         // If user only manages one organization, pre-select it
         if (providers.length === 1) {
-          setFormData(prev => ({
-            ...prev,
-            organization: providers[0].id,
-            contactEmail: providers[0].email || prev.contactEmail,
-            contactPhone: providers[0].phone || prev.contactPhone
-          }))
+          const firstProvider = providers[0]
+          if (firstProvider) {
+            setFormData(prev => ({
+              ...prev,
+              organization: firstProvider.id,
+              contactEmail: firstProvider.email || prev.contactEmail,
+              contactPhone: firstProvider.phone || prev.contactPhone
+            }))
+          }
         }
       } catch (err) {
         console.error('Error loading managed organizations:', err)
@@ -209,8 +212,7 @@ export default function NewEventPage() {
         contactPhone: formData.contactPhone || '',
         isVirtual: formData.isVirtual,
         createdBy: user.uid,
-        eventStatus,
-        status: 'active'
+        eventStatus
       }
 
       // Only add capacity if it's provided

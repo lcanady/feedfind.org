@@ -369,7 +369,7 @@ export class CommunityEventsService extends DatabaseService {
         const data = eventDoc.data() as CommunityEvent
         
         // Check if spots are available
-        if (data.capacity && data.registered >= data.capacity) {
+        if (data.capacity && (data.registered || 0) >= data.capacity) {
           throw new Error('No spots available')
         }
 
@@ -452,8 +452,10 @@ export class CommunityEventsService extends DatabaseService {
 }
 
 // Community Resources Service
-class CommunityResourcesService {
-  private readonly collectionName = 'community_resources'
+class CommunityResourcesService extends DatabaseService {
+  constructor() {
+    super('community_resources')
+  }
 
   async getResources() {
     try {
@@ -595,13 +597,13 @@ class CommunityResourcesService {
     return this.subscribeToCollection<CommunityResource>(callback, constraints)
   }
 
-  async getPopularResources(limit: number = 5): Promise<CommunityResource[]> {
+  async getPopularResources(maxResults: number = 5): Promise<CommunityResource[]> {
     try {
       const q = query(
         collection(db, this.collectionName),
         where('status', '==', 'active'),
         orderBy('views', 'desc'),
-        limit(limit)
+        limit(maxResults)
       )
       const snapshot = await getDocs(q)
       return snapshot.docs.map(doc => ({

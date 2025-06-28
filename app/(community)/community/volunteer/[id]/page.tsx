@@ -200,7 +200,7 @@ export default function VolunteerOpportunityPage() {
                     
                     <div className="flex items-center space-x-4">
                       {/* Show edit button if user is the creator or manages the organization */}
-                      {user && (opportunity.createdBy === user.uid || opportunity.organizationId === user.profile?.organizationId) && (
+                      {user && opportunity.createdBy === user.uid && (
                         <Link
                           href={`/community/volunteer/edit/${opportunity.id}`}
                           className="inline-flex items-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"

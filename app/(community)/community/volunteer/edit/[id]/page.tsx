@@ -8,6 +8,32 @@ import { volunteerService } from '@/lib/communityService'
 import Header from '@/components/layout/Header'
 import type { VolunteerOpportunity, UpdateVolunteerOpportunityData } from '@/types/database'
 
+// Form interface that uses strings for dates (HTML form inputs)
+interface FormData {
+  title: string
+  description: string
+  location: string
+  address: string
+  isRemote: boolean
+  isOngoing: boolean
+  startDate: string
+  endDate: string
+  schedule: string
+  timeCommitment: string
+  estimatedHours: string
+  skills: string[]
+  requirements: string[]
+  ageRestriction: string
+  backgroundCheckRequired: boolean
+  trainingRequired: boolean
+  spotsTotal: string
+  contactEmail: string
+  contactPhone: string
+  applicationUrl: string
+  urgency: 'low' | 'normal' | 'high' | 'urgent'
+  category: 'food_distribution' | 'kitchen_help' | 'delivery' | 'events' | 'admin' | 'other'
+}
+
 export default function EditVolunteerOpportunityPage() {
   const params = useParams()
   const router = useRouter()
@@ -21,7 +47,7 @@ export default function EditVolunteerOpportunityPage() {
   const [requirementInput, setRequirementInput] = useState('')
   const [opportunity, setOpportunity] = useState<VolunteerOpportunity | null>(null)
   
-  const [formData, setFormData] = useState<UpdateVolunteerOpportunityData>({
+  const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
     location: '',
@@ -60,12 +86,20 @@ export default function EditVolunteerOpportunityPage() {
         }
 
         // Check if user has permission to edit
-        if (data.createdBy !== user.uid && data.organizationId !== user.profile?.organizationId) {
+        if (data.createdBy !== user.uid) {
           setError('You do not have permission to edit this opportunity')
           return
         }
 
         setOpportunity(data)
+        
+        // Helper function to convert date to string
+        const dateToString = (date: any): string => {
+          if (!date) return ''
+          const dateObj = date instanceof Date ? date : date.toDate()
+          return dateObj.toISOString().split('T')[0]
+        }
+
         setFormData({
           title: data.title,
           description: data.description,
@@ -73,10 +107,10 @@ export default function EditVolunteerOpportunityPage() {
           address: data.address || '',
           isRemote: data.isRemote || false,
           isOngoing: data.isOngoing || true,
-          startDate: data.startDate ? new Date(data.startDate).toISOString().split('T')[0] : '',
-          endDate: data.endDate ? new Date(data.endDate).toISOString().split('T')[0] : '',
+          startDate: dateToString(data.startDate),
+          endDate: dateToString(data.endDate),
           schedule: data.schedule || '',
-          timeCommitment: data.timeCommitment,
+          timeCommitment: data.timeCommitment || '',
           estimatedHours: data.estimatedHours?.toString() || '',
           skills: data.skills || [],
           requirements: data.requirements || [],
@@ -101,7 +135,7 @@ export default function EditVolunteerOpportunityPage() {
     loadOpportunity()
   }, [user, opportunityId])
 
-  const handleInputChange = (field: keyof UpdateVolunteerOpportunityData, value: any) => {
+  const handleInputChange = (field: keyof FormData, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
@@ -151,7 +185,16 @@ export default function EditVolunteerOpportunityPage() {
     setError(null)
 
     try {
-      await volunteerService.update(opportunityId, formData)
+      // Convert form data to database format
+      const updateData: UpdateVolunteerOpportunityData = {
+        ...formData,
+        startDate: formData.startDate ? new Date(formData.startDate) : undefined,
+        endDate: formData.endDate ? new Date(formData.endDate) : undefined,
+        estimatedHours: formData.estimatedHours ? parseInt(formData.estimatedHours) : undefined,
+        spotsTotal: formData.spotsTotal ? parseInt(formData.spotsTotal) : undefined
+      }
+
+      await volunteerService.update(opportunityId, updateData)
       router.push(`/community/volunteer/${opportunityId}`)
     } catch (error) {
       console.error('Error updating opportunity:', error)

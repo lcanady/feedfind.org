@@ -91,12 +91,14 @@ export default function PostVolunteerOpportunityPage() {
         // If there's only one provider, auto-select it
         if (userProviders.length === 1) {
           const provider = userProviders[0]
-          setFormData(prev => ({
-            ...prev,
-            organization: provider.id,
-            contactEmail: provider.email,
-            contactPhone: provider.phone ? provider.phone : prev.contactPhone
-          }))
+          if (provider) {
+            setFormData(prev => ({
+              ...prev,
+              organization: provider.id,
+              contactEmail: provider.email,
+              contactPhone: provider.phone ? provider.phone : prev.contactPhone
+            }))
+          }
         }
       } catch (error) {
         console.error('Error loading providers:', error)
@@ -218,8 +220,7 @@ export default function PostVolunteerOpportunityPage() {
         urgency: formData.urgency,
         category: formData.category,
         createdBy: user.uid,
-        spotsTotal: formData.spotsTotal ? parseInt(formData.spotsTotal) : undefined,
-        spotsAvailable: formData.spotsTotal ? parseInt(formData.spotsTotal) : undefined
+        spotsTotal: formData.spotsTotal ? parseInt(formData.spotsTotal) : undefined
       }
 
       // Add optional fields if they have values

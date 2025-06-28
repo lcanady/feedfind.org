@@ -395,7 +395,7 @@ export function useCommunityData() {
         type: 'resource', 
         data: r, 
         date: r.createdAt,
-        author: r.author || 'Anonymous',
+        author: r.authorName || 'Anonymous',
         title: r.title
       }))
     ]

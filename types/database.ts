@@ -5,7 +5,7 @@ export interface BaseDocument {
   id: string
   createdAt: Timestamp | Date
   updatedAt: Timestamp | Date
-  status: 'active' | 'inactive' | 'deleted'
+  status: string
 }
 
 // User role types

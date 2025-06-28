@@ -203,7 +203,12 @@ export const BulkPostingForm: React.FC = () => {
         throw new Error('File must contain at least a header row and one data row')
       }
 
-      const headers = lines[0].split(',').map(h => h.trim().toLowerCase())
+      const firstLine = lines[0]
+      if (!firstLine) {
+        throw new Error('Header row is empty')
+      }
+
+      const headers = firstLine.split(',').map(h => h.trim().toLowerCase())
       const data: BulkLocationData[] = []
 
       // Expected headers
@@ -216,7 +221,10 @@ export const BulkPostingForm: React.FC = () => {
 
       // Parse data rows
       for (let i = 1; i < lines.length; i++) {
-        const values = lines[i].split(',').map(v => v.trim().replace(/"/g, ''))
+        const line = lines[i]
+        if (!line) continue
+        
+        const values = line.split(',').map(v => v.trim().replace(/"/g, ''))
         const location: BulkLocationData = {
           name: '',
           address: ''
@@ -338,6 +346,8 @@ export const BulkPostingForm: React.FC = () => {
     try {
       for (let i = 0; i < locationsToProcess.length; i++) {
         const location = locationsToProcess[i]
+        if (!location) continue
+        
         const validationErrors = validateLocation(location)
         
         if (validationErrors.length > 0) {

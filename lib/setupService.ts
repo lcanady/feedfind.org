@@ -49,6 +49,7 @@ export class SetupService {
         id: firebaseUser.uid,
         email: firebaseUser.email || data.email,
         role: 'superuser', // This is the superuser with highest privileges
+        status: 'active',
         profile: userProfile,
         isEmailVerified: firebaseUser.emailVerified,
         createdAt: serverTimestamp() as any,
@@ -117,6 +118,7 @@ export class SetupService {
         id: firebaseUser.uid,
         email: firebaseUser.email || data.email,
         role: 'superuser', // This is the superuser with highest privileges
+        status: 'active',
         profile: userProfile,
         isEmailVerified: firebaseUser.emailVerified,
         createdAt: serverTimestamp() as any,
